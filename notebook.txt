@@ -1,0 +1,17 @@
+[installation]
+1. gensim need python 3.11, not 3.13
+2. pip install -r requirements.txt
+
+[pipeline]
+1. pre-training model: main.py, configuration in file config
+
+[node type]
+Class	First	Root	Appears
+0	-	-	-
+1	-	-	+
+2	-	+	-
+3	-	+	+
+4	+	-	-
+5	+	-	+
+6	+	+	-
+7	+	+	+
