@@ -1,14 +1,14 @@
 # !mandatory! task to execute, operation available: "training" (for embedding files), "match" (for batch ER task), "test" (for verify accuracy of matching), "smatch" for streaming data, "experiment" for calculating pre-defined metrics
 ######### input config:
 task:smatch
-graph_file:pipeline/graph/amazon_google.graphml
+graph_file:pipeline/graph/fodors_zagats.graphml
 write_edges:true
 # input embedding file, mandatory for "stream" task
-embeddings_file:pipeline/embeddings/amazon_google.emb
+embeddings_file:pipeline/embeddings/fodors_zagats.emb
 log_path:pipeline/logging
 source_num:1362
 ######## output config
-output_file_name:amazon_google-08_04_001
+output_file_name:fodors_zagats-001
 
 ########## graph config:
 ### tn: token as number,### tt: token as text, ### idx: id of row, ### cid: id of column

@@ -3,10 +3,10 @@ task:experiment
 
 ######### files config #########
 # ground truth file
-match_file:/home/zhongwei/Data_ingestion/Embdi/EmbDI datasets/pipeline/matches/er-matches/matches-amazon_google.txt
+match_file:Data_example/fodors_zagats-matches.txt
 # similarity list for stream process
-similarity_file:pipeline/similarity/amazon_google-07_04_006.db
-output_file_name:amazon_google-07_04_006
+similarity_file:pipeline/similarity/fodors_zagats-001.db
+output_file_name:fodors_zagats-001
 # similarity list for bkendall Tau calculation
 similarity_file_ken:pipeline/similarity/batch1.db
 

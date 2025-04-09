@@ -3,10 +3,9 @@
 # task type: {train, test, match, train-test, train-match}
 task:batch
 write_edges:false
-dataset_file:/home/zhongwei/Data_ingestion/Embdi/EmbDI datasets/er datasets/amazon_google-tableA.csv
+dataset_file:Data_example/fodors_zagats-tableA.csv
 # ######### for pre-training of stream
-# output_file:amazon_google-tableA-batch
-output_file_name:amazon_google-tableA_013
+output_file_name:fodors_zagats
 log_path:pipeline/logging
 
 ########## graph config:
