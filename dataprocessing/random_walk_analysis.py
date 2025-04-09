@@ -126,7 +126,7 @@ def random_walk_analysis(graph, output_file_name):
         node_freq = freq_sup_2000[node_name]["freq"]
         # exp_logger.info(f"# node name: {node_name}, node type: {node_type}, node frequency: {node_freq}")
 
-    graph_path = "/home/zhongwei/Data_ingestion/embIng/pipeline/stat"
+    graph_path = "pipeline/stat"
     print(graph_path)
     clipped_vis_idx = {k: min(v, 2000) for k, v in vis_idx.items()}
     clipped_vis_token = {k: min(v, 2000) for k, v in vis_token.items()}

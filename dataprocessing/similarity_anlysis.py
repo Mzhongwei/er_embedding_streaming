@@ -35,6 +35,6 @@ def similarity_analysis(sim_list, actual_matches, output_file_name):
     plt.grid(True)
     plt.tight_layout()
 
-    plt.savefig(f"/home/zhongwei/Data_ingestion/embIng/pipeline/stat/sim_degree-{output_file_name}.png", dpi=300) 
+    plt.savefig(f"pipeline/stat/sim_degree-{output_file_name}.png", dpi=300)
 
     plt.show()

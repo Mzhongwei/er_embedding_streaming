@@ -177,7 +177,7 @@ class ConsumerService:
 
             print(f"Saving graph with attributes... Graph file: /home/zhongwei/Data_ingestion/embIng/pipeline/graph")
             g = self.graph.clean_attributes()
-            g.write_graphml(f"/home/zhongwei/Data_ingestion/embIng/pipeline/graph/graph-{self.output_file_name}.graphml")
+            g.write_graphml(f"pipeline/graph/graph-{self.output_file_name}.graphml")
             print("Graph saved!")
             print("Process over!!!!!!!!!!!!!!!!")
 
