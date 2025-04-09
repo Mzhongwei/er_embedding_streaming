@@ -71,7 +71,7 @@ def batch_driver(configuration):
     
     print(f"Saving graph with attributes... Graph file path: /home/zhongwei/Data_ingestion/embIng/pipeline/graph")
     g = graph.clean_attributes()
-    g.write_graphml(f"/home/zhongwei/Data_ingestion/embIng/pipeline/graph/{configuration['output_file_name']}.graphml")
+    g.write_graphml(f"pipeline/{configuration['output_file_name']}.graphml")
     print("Graph saved!")
 
 def streaming_driver(configuration):
