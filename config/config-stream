@@ -1,10 +1,10 @@
 # !mandatory! task to execute, operation available: "training" (for embedding files), "match" (for batch ER task), "test" (for verify accuracy of matching), "smatch" for streaming data, "experiment" for calculating pre-defined metrics
 ######### input config:
 task:smatch
-graph_file:/home/zhongwei/Data_ingestion/embIng/pipeline/graph/amazon_google.graphml
+graph_file:pipeline/graph/amazon_google.graphml
 write_edges:true
 # input embedding file, mandatory for "stream" task
-embeddings_file:/home/zhongwei/Data_ingestion/embIng/pipeline/embeddings/amazon_google.emb
+embeddings_file:pipeline/embeddings/amazon_google.emb
 log_path:pipeline/logging
 source_num:1362
 ######## output config
