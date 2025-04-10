@@ -20,16 +20,15 @@ from utils.write_log import write_log
 task_queue = queue.Queue()
     
 class ConsumerService:
-    def __init__(self, configuration, graph, model, output_file_name, prefixes, metrics):
+    def __init__(self, configuration, graph, model, output_file_name, metrics):
         self.config = configuration
         self.graph = graph
         self.model = model
         self.strategy_suppl = configuration["strategy_suppl"]
         self.strategy_model = None
         self.output_file_name = output_file_name
-        self.prefixes = prefixes
         self.sim_list = SimilarityList(
-                            configuration["most_similar_inlist_n"],
+                            configuration["simlist_n"],
                             configuration["output_format"]
                         )
         self.window_data = deque()
@@ -80,9 +79,9 @@ class ConsumerService:
         for target in tqdm(df.loc[:,"rid"], desc= "# build similarity list. "):
             try:
                 if self.strategy_suppl == "basic":
-                    similar = dynentity_resolution(self.model, target, self.config["most_similar_k"])
+                    similar = dynentity_resolution(self.model, target, self.config["top_k"])
                 elif self.strategy_suppl == "faiss":
-                    similar = self.strategy_model.get_similar_words([self.model.wv[target]], target, self.config["most_similar_k"])
+                    similar = self.strategy_model.get_similar_words([self.model.wv[target]], target, self.config["top_k"])
 
                 if int(self.config['source_num']) > 0 and similar != []:
                     similar = self._filter_list(similar)
@@ -93,7 +92,7 @@ class ConsumerService:
                     if self.sim_list.output_format == "db":
                         # print(target)
                         self.sim_list.insert_data(target)
-                    # print(self.sim_list.get_similarity_words_with_score(target, self.config["show_m_most_similar"]))
+                    # print(self.sim_list.get_similarity_words_with_score(target, self.config["simlist_show"]))
                     for word, score in similar:
                         self.sim_list.add_similarity(word, [(target, score)])
                         if self.sim_list.output_format == "db":
@@ -302,12 +301,12 @@ def _start_prometheus_port():
     print("start thread prometheus..")
     start_http_server(8000)
                                 
-def start_kafka_consumer(configuration, graph, model, output_file_name, prefixes):
+def start_kafka_consumer(configuration, graph, model, output_file_name):
     metrics = Metrics()
     t = threading.Thread(target=_start_prometheus_port, daemon=True)
     t.start()
 
-    consumer = ConsumerService(configuration, graph, model, output_file_name, prefixes, metrics)
+    consumer = ConsumerService(configuration, graph, model, output_file_name, metrics)
     # check output path
     consumer.sim_list.check_output_path(output_file_name)
     if consumer.sim_list.output_format != "db":

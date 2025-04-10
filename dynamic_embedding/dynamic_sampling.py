@@ -32,7 +32,7 @@ class RandomWalk:
                     first_node_name = i_graph.vs[first_node_indice]['name']
                     self.walk = [first_node_name, starting_node_name]
                 else:
-                    raise ValueError(f"The first node of the sentence could not be found. Please check your prefix property settings.")
+                    raise ValueError(f"The first node of the sentence could not be found. Please check your node_types settings.")
             except Exception:
                 print(f"The first node of the sentence could not be found. Please check node {starting_node_name}.")
                 app_debug.error(f"The first node of the sentence could not be found. Please check node {starting_node_name}, index {starting_node_index}.")
@@ -84,28 +84,28 @@ def dynrandom_walks_generation(configuration, graph):
     :return: the collection of random walks
     """
     sentences = []
-    sentence_length = int(configuration["sentence_length"])
+    walk_length = int(configuration["walk_length"])
     backtrack = configuration["backtrack"]
-    random_walks_per_node = configuration["random_walks_per_node"]
+    walks_number = configuration["walks_number"]
 
     roots_index = graph.dyn_roots
     
 
     # ########### Random walks ############
     sentence_counter = 0
-    if random_walks_per_node > 0:
-        pbar = tqdm(desc="# Sentence generation progress: ", total=len(roots_index)*configuration['random_walks_per_node'])
+    if walks_number > 0:
+        pbar = tqdm(desc="# Sentence generation progress: ", total=len(roots_index)*configuration['walks_number'])
         for root in roots_index:
             # if cell in intersection:
             ######## random walk for each node
             r = []
-            for _r in range(random_walks_per_node):
+            for _r in range(walks_number):
                 try:
 
                     w = RandomWalk(
                         graph,
                         root,
-                        sentence_length,
+                        walk_length,
                         backtrack
                     )
                 except Exception as e:
@@ -127,9 +127,9 @@ def dynrandom_walks_generation(configuration, graph):
                 else:
                     pass
             sentences += r
-            sentence_counter += random_walks_per_node
+            sentence_counter += walks_number
            
-            pbar.update(random_walks_per_node)
+            pbar.update(walks_number)
         pbar.close()
 
     graph.dyn_roots.clear()

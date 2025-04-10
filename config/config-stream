@@ -1,50 +1,53 @@
-# !mandatory! task to execute, operation available: "training" (for embedding files), "match" (for batch ER task), "test" (for verify accuracy of matching), "smatch" for streaming data, "experiment" for calculating pre-defined metrics
-######### input config:
+######### mandatory config:
+# task operation available: "batch" (pre-training of stream), "smatch", "experiment"
 task:smatch
+# mandatory for stream match with pre-trained models
 graph_file:pipeline/graph/fodors_zagats.graphml
-write_edges:true
-# input embedding file, mandatory for "stream" task
 embeddings_file:pipeline/embeddings/fodors_zagats.emb
-log_path:pipeline/logging
-source_num:1362
-######## output config
+
+######## optional config #########
 output_file_name:fodors_zagats-001
+########## log config:
+log_path:pipeline/logging
 
 ########## graph config:
-### tn: token as number,### tt: token as text, ### idx: id of row, ### cid: id of column
-### $ represent this value is a string, # represente number
-### at the beginning, the number (1-7) represent class of this type of value, definition of different classes is written at file README
+# "tn": token as number, "tt": token as text, "idx": id of row, "cid": id of column
+# "$": string, "#": number
+# (1-7): class of this type of value, definition of different classes is written at file README
 node_types:["7#__tn", "7$__tt", "3$__idx", "1$__cid"]
-### [The graph algorithm will split all nodes with a prefix listed here]
+# graph construction algorithm will split all nodes with a prefix listed here
 flatten:tt
-##### smooth: smooth/inverse_smooth/log/inverse/no
+# smooth method: log/no
 smoothing_method:no
 directed:false
 
 ########### walks config:
 write_walks:true
-sentence_length:60
-# Whether backtracking is allowed (whether it is possible to return to the previous node).
+# step size
+walk_length:60
+# number of sentences generated from a root node
+walks_number:20
+# whether it is possible to return to the previous node
 backtrack:false
-random_walks_per_node:20
-# random walk vis (statistics overview)
+# statistical overview/vis for random walk
 rw_stat:true
 
 ########## Embeddings configuration:
 learning_method:skipgram
 window_size:3
 n_dimensions:300
-# choices for training algo : word2vec, fasttext, doc2vec
+# choices for training algo : word2vec, fasttext
 training_algorithm:word2vec
 
-########### sim list config:
-most_similar_k:10
-most_similar_inlist_n:10
-show_m_most_similar:5
+########### similarity list config:
+top_k:10
+simlist_n:10
+simlist_show:5
 # strategy to calculate similarity: "basic" or "faiss"
 strategy_suppl:faiss
-# output format for silimarity list : {sqlite3, json, parquet}
+# output format for silimarity list : {db, json, parquet}
 output_format:db
+source_num:1362
 
 ########## kafka config:
 kafka_topicid:entity_resolution_process

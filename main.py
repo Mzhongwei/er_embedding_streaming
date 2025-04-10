@@ -35,7 +35,6 @@ def batch_driver(configuration):
     print('Config saved!')
     
     dataset_file = configuration['dataset_file']
-    configuration['node_types'] = ast.literal_eval(configuration['node_types'])
     print('loading edgelist file...')
 
     df_table = pd.read_csv(dataset_file) 
@@ -52,7 +51,7 @@ def batch_driver(configuration):
     print(f"dyn roots len: {len(graph.dyn_roots)}")
 
     # random walk
-    configuration['random_walks_per_node'] = int(configuration["random_walks_per_node"])
+    configuration['walks_number'] = int(configuration["walks_number"])
     walks = dynrandom_walks_generation(configuration, graph)
     
     # training model
@@ -71,7 +70,7 @@ def batch_driver(configuration):
     
     print(f"Saving graph with attributes... Graph file path: /home/zhongwei/Data_ingestion/embIng/pipeline/graph")
     g = graph.clean_attributes()
-    g.write_graphml(f"pipeline/{configuration['output_file_name']}.graphml")
+    g.write_graphml(f"pipeline/graph/{configuration['output_file_name']}.graphml")
     print("Graph saved!")
 
 def streaming_driver(configuration):
@@ -87,10 +86,8 @@ def streaming_driver(configuration):
     ########### init #########
     ##### load edgelist
     graph_file = configuration['graph_file']
-    prefixes = ast.literal_eval(configuration['node_types'])
-    configuration['node_types'] = ast.literal_eval(configuration['node_types'])
-    configuration['random_walks_per_node'] = int(configuration["random_walks_per_node"])
-    print("random_walks_per_node stream", configuration['random_walks_per_node'])
+    configuration['walks_number'] = int(configuration["walks_number"])
+    print("walks_number stream", configuration['walks_number'])
 
     ##### generate empty Graph
     graph = dyn_graph_generation(configuration)
@@ -126,12 +123,9 @@ def streaming_driver(configuration):
     ########### stream part ##############
     print('Streaming...')
     output_file_name = configuration['output_file_name']
-    start_kafka_consumer(configuration, graph, model, output_file_name, prefixes)
+    start_kafka_consumer(configuration, graph, model, output_file_name)
 
 def experimenting_driver(configuration):
-    # if configuration['kendall'] == "true":
-    #     compare_kendall(configuration)
-    # else:
     compare_ground_truth(configuration)
 
 def read_configuration(config_file):
@@ -175,10 +169,7 @@ def main(file_path=None, dir_path=None, args=None):
     configuration = None
 
     # Building dir tree required to run the code.
-    os.makedirs('pipeline/dump', exist_ok=True)
-    os.makedirs('pipeline/walks', exist_ok=True)
     os.makedirs('pipeline/embeddings', exist_ok=True)
-    os.makedirs('pipeline/generated-matches', exist_ok=True)
     os.makedirs('pipeline/logging', exist_ok=True)
     os.makedirs('pipeline/graph', exist_ok=True)
     os.makedirs('pipeline/stat', exist_ok=True)
@@ -250,8 +241,6 @@ def main(file_path=None, dir_path=None, args=None):
             print(OUTPUT_FORMAT.format('Ending run.', t_end.strftime(TIME_FORMAT)))
             dt = t_end - t_start
             print('# Time required: {:.2f} s'.format(dt.total_seconds()))
-
-    # clean_dump()
 
 if __name__ == '__main__':
     args = parse_args()

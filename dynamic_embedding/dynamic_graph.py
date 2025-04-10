@@ -18,11 +18,11 @@ app_debug = write_log("pipeline/logging", "debug", "dynamic_graph")
 
 
 class DynGraphIgraph:
-    def __init__(self, prefixes=None, flatten=[], directed=False, smooth=None):
+    def __init__(self, node_types=None, flatten=[], directed=False, smooth=None):
         self.graph = ig.Graph(directed=directed)
         self.node_classes = {}  # prefix -> class ID (for node_class logic) ex. {'idx': 5, 'cid': 0}
         self.node_is_numeric = {} # ex. {'idx' : false, 'cid': false}
-        self.to_flatten = flatten if flatten != 'all' else []
+        self.to_flatten = flatten if flatten != 'no' else []
         self.dyn_roots=set()
         self.samplers = []
 
@@ -35,20 +35,20 @@ class DynGraphIgraph:
         # set edge weight
         self.graph['weighted'] = directed
 
-        if prefixes:
-            self._extract_prefix(prefixes)
+        if node_types:
+            self._extract_node_types(node_types)
             self._check_flatten()
 
-    def _extract_prefix(self, prefixes):
-        for prefix in prefixes:
-            class_info, name = prefix.split('__')
+    def _extract_node_types(self, node_types):
+        for node_type in node_types:
+            class_info, name = node_type.split('__')
             rwclass = int(class_info[0])
             num_flag = class_info[1]
             self.node_classes[name] = rwclass
             self.node_is_numeric[name] = True if num_flag == '#' else False
 
     def _check_flatten(self):
-        if self.to_flatten and self.to_flatten != 'all':
+        if self.to_flatten and self.to_flatten != 'no':
             for prefix in self.to_flatten:
                 if prefix not in self.node_classes:
                     raise ValueError(f'Unknown flatten type: {prefix}')
@@ -361,10 +361,10 @@ def dyn_graph_generation(configuration):
     t_start = datetime.datetime.now()
     print(OUTPUT_FORMAT.format('Starting graph construction', t_start.strftime(TIME_FORMAT)))
 
-    prefixes = configuration["node_types"]
+    node_types = configuration["node_types"]
     directed = configuration["directed"]
     smooth = configuration["smoothing_method"]
-    g = DynGraphIgraph(prefixes=prefixes, flatten=flatten, directed=directed, smooth=smooth)
+    g = DynGraphIgraph(node_types=node_types, flatten=flatten, directed=directed, smooth=smooth)
     t_end = datetime.datetime.now()
     dt = t_end - t_start
     print()

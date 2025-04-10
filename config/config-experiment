@@ -1,26 +1,23 @@
-# !mandatory! task to execute, operation available: "training" (for embedding files), "match" (for ER task), "test" (for verify accuracy of matching) 
+######### mandatory config (mandatory):
+# task operation available: "batch" (pre-training of stream), "smatch", "experiment"
 task:experiment
-
-######### files config #########
-# ground truth file
-match_file:Data_example/fodors_zagats-matches.txt
 # similarity list for stream process
 similarity_file:pipeline/similarity/fodors_zagats-001.db
+# ground truth file
+match_file:Data_example/fodors_zagats-matches.txt
+# numbers of pre-training data in batch er tasks. Required when calculating kendall Tau
+
+
+######## optional config #########
+source_num:1362
 output_file_name:fodors_zagats-001
-# similarity list for bkendall Tau calculation
-similarity_file_ken:pipeline/similarity/batch1.db
+########## log config:
+log_path:pipeline/logging
 
 ######### test config #########
 # take records with top n similar degrees
 n_first:10
 # similarity retains x decimal places
 approximate:16
-# kendall == false: calculate precision, recall, f1; kendall == true: calcute kendall Tau
-# kendall:false
-# numbers of pre-training data in batch er tasks. Required when calculating kendall Tau
-source_num:1362
 # visualization of result or not
 sim_vis:true
-
-######### log config #########
-log_path:pipeline/logging
