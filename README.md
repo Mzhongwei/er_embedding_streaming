@@ -29,7 +29,7 @@ Each configuration file contains several blocks:
 - **optional**: You can customize these values as needed; otherwise, the program will fall back to default settings (the default configuration values are attached at the end of the article).
 
 > 📌 **Attention**:  
-> - Please select a appropriate task type. `batch` for pre-training models, "smatch" for er on streaming data, `evaluation` for evaluating results; \
+> - Please select a appropriate task type. `batch` for pre-training models, "smatch" for er on streaming data, `evaluation` for evaluating results;
 > - Make sure to update the configuration file paths (e.g., dataset files, task type, etc.) according to your environment.
 
 ## 🧪 PIPELINES AND EVALUATION
@@ -80,7 +80,6 @@ For verifying the results of the experiment, pls run `python main.py -f config/c
 | simlist_show| 5 | 
 | strategy_suppl| "faiss" | 
 | output_format| "db" | 
-| source_num| 0 | 
 | kafka_topicid| "entity_resolution_process" | 
 | kafka_groupid| "er_group" | 
 | bootstrap_servers| "localhost" | 
