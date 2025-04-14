@@ -1,16 +1,18 @@
 ######### mandatory config:
-# task operation available: "batch" (pre-training of stream), "smatch", "experiment"
+# task operation available: "batch" (pre-training of stream), "smatch", "evaluation"
 task:smatch
-# mandatory for stream match with pre-trained models
+
+######### optional config #########
+### mandatory for stream match with pre-trained models
 graph_file:pipeline/graph/fodors_zagats.graphml
 embeddings_file:pipeline/embeddings/fodors_zagats.emb
 
-######## optional config #########
 output_file_name:fodors_zagats-001
-########## log config:
+
+### log config:
 log_path:pipeline/logging
 
-########## graph config:
+### graph config:
 # "tn": token as number, "tt": token as text, "idx": id of row, "cid": id of column
 # "$": string, "#": number
 # (1-7): class of this type of value, definition of different classes is written at file README
@@ -21,7 +23,7 @@ flatten:tt
 smoothing_method:no
 directed:false
 
-########### walks config:
+### walks config:
 write_walks:true
 # step size
 walk_length:60
@@ -32,14 +34,14 @@ backtrack:false
 # statistical overview/vis for random walk
 rw_stat:true
 
-########## Embeddings configuration:
+### Embeddings configuration:
 learning_method:skipgram
 window_size:3
 n_dimensions:300
 # choices for training algo : word2vec, fasttext
 training_algorithm:word2vec
 
-########### similarity list config:
+### similarity list config:
 top_k:10
 simlist_n:10
 simlist_show:5
@@ -47,17 +49,17 @@ simlist_show:5
 strategy_suppl:faiss
 # output format for silimarity list : {db, json, parquet}
 output_format:db
-source_num:1362
 
-########## kafka config:
+### kafka config:
 kafka_topicid:entity_resolution_process
 kafka_groupid:er_group
 bootstrap_servers:localhost
 port:9092
 # strategy for sliding windows: "count" for count-based, "time" for time-based
 window_strategy:count
-window_count:136
-# time interval to execute entity resolution task (s) 
+# count-based: nomber of records for each mini-batch
+window_count:53
+# time-based: time interval to execute entity resolution task (s) 
 window_time:3
 # stride for sliding windows or update interval of time (s), 0 --> tumbling windows
 update_frequency:0

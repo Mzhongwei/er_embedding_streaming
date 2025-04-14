@@ -14,7 +14,7 @@ from sklearn.decomposition import PCA
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 OUTPUT_FORMAT = "# {:.<60} {}"
 
-POSSIBLE_TASKS = ["smatch", "batch", "experiment"]
+POSSIBLE_TASKS = ["smatch", "batch", "evaluation"]
 
 MLFLOW_NOT_FOUND = False
 
@@ -32,12 +32,11 @@ def _convert_to_bool(config, key):
             config[key] = True
     return config
 
-def _return_default_values_exp(config):
+def _return_default_values_eva(config):
     default_values = {
         "n_first": 3,
         "approximate": 16,
-        "sim_vis": True,
-        "source_num":0
+        "sim_vis": True
     }
 
     for k in default_values:
@@ -46,9 +45,8 @@ def _return_default_values_exp(config):
 
     config["n_first"] = int(config["n_first"])
     config["approximate"] = int(config["approximate"])
-    config["source_num"] = int(config["source_num"])
 
-    config = _convert_to_bool(config, ["sim_vis"])
+    config = _convert_to_bool(config, "sim_vis")
 
     return config
 
@@ -108,13 +106,12 @@ def _return_default_values_sk(config):
         "simlist_show":5,
         "strategy_suppl":"faiss",
         "output_format":"db",
-        "source_num":0,
         "kafka_topicid":"entity_resolution_process",
         "kafka_groupid":"er_group",
         "bootstrap_servers":"localhost",
         "port":"9092",
         "window_strategy":"count",
-        "window_count":136,
+        "window_count":50,
         "update_frequency":0
     }
 
@@ -126,7 +123,6 @@ def _return_default_values_sk(config):
     config["top_k"] = int(config["top_k"])
     config["simlist_n"] = int(config["simlist_n"])
     config["simlist_show"] = int(config["simlist_show"])
-    config["source_num"] = int(config["source_num"])
             
     if config["window_strategy"] not in ["count", "time"]:
         raise ValueError("Expected sliding window strategy, pls choose between [\"count\", \"time\"]")
@@ -162,8 +158,8 @@ def check_config_validity(config):
     if config["task"] not in POSSIBLE_TASKS:
         raise ValueError("Task {} not supported.".format(config["task"]))
  
-    if "experiment" in config["task"]:
-        config = _return_default_values_exp(config)
+    if "evaluation" in config["task"]:
+        config = _return_default_values_eva(config)
         _check_file(config, ['similarity_file', 'match_file'])
         config["output_format"] = pathlib.Path(config["similarity_file"]).suffix[1:]
     elif "smatch" in config["task"]:

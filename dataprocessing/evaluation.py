@@ -173,13 +173,13 @@ def compare_ground_truth(configuration):
     f1_score = 2*precision*recall / (precision + recall) if (precision + recall) != 0 else 0.0
 
     # print results
-    print(f'''Experiment result for {similarity_file}: \n correct matches: {correct_matches} \n total number of predicted matches: {total_predicted_matches} \n total number of matches in groud truth file: {total_relevant_matches} \n \n precision: {precision} \n recall: {recall} \n f1 score: {f1_score}''')
+    print(f'''Evaluation result for {similarity_file}: \n correct matches: {correct_matches} \n total number of predicted matches: {total_predicted_matches} \n total number of matches in groud truth file: {total_relevant_matches} \n \n precision: {precision} \n recall: {recall} \n f1 score: {f1_score}''')
 
     # output results to log file
-    dir_name = "experiments"
+    dir_name = "evaluation"
     Path(f'''{configuration["log_path"]}/{dir_name}''').mkdir(parents=True, exist_ok=True)
     logger = write_log(f'''{configuration["log_path"]}''', dir_name, dir_name)
     
-    logger.info(f'''[RESULTS] Experiment result of similarity list in file [{similarity_file}] by taking records with top {configuration["n_first"]} similarity and the similarity retains {configuration['approximate']} decimal places: \n correct matches: {correct_matches} \n total number of predicted matches: {total_predicted_matches} \n total number of matches in groud truth file: {total_relevant_matches} \n \n precision: {precision} \n recall: {recall} \n f1 score: {f1_score}''')
+    logger.info(f'''[RESULTS] Evaluation result of similarity list in file [{similarity_file}] by taking records with top {configuration["n_first"]} similarity and the similarity retains {configuration['approximate']} decimal places: \n correct matches: {correct_matches} \n total number of predicted matches: {total_predicted_matches} \n total number of matches in groud truth file: {total_relevant_matches} \n \n precision: {precision} \n recall: {recall} \n f1 score: {f1_score}''')
     
     # return precision, recall, f1_score

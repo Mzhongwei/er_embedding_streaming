@@ -37,7 +37,7 @@ def random_walk_analysis(graph, output_file_name):
     freq_idx = 0
     vis_cid = {}
     freq_cid = 0
-    freq_sup_2000 = {}
+    freqs = {}
 
     i = 0
     i_idx = 0
@@ -81,8 +81,8 @@ def random_walk_analysis(graph, output_file_name):
                 most_visited_num = i_cid
             else:
                 most_visited_num = i_token
-        if freq >= 2000:
-            freq_sup_2000[node_name]={"freq": freq, "type": node_type}
+        # if freq >= 2000:
+        freqs[node_name]={"freq": freq, "type": node_type}
         
         if v["test_neighbors_freq"] and node_type == 'cid':
             test_neighbors_freq = v["test_neighbors_freq"]
@@ -119,17 +119,19 @@ def random_walk_analysis(graph, output_file_name):
                         random walk for pretraining nodes and dyntraning nodes: {m_pretraining}, {n_pretraining}, {m_dyntraining}, {n_dyntraining}
                         nomber of nodes never visited : {never_visited}
                         info of most visited node: frequency-{most_visited_freq}, node-type-{most_visited_type}, number-{most_visited_num}
-                        nodes whose frenquency is above 2000:
                         ''')
-    for node_name in freq_sup_2000:
-        node_type = freq_sup_2000[node_name]["type"]
-        node_freq = freq_sup_2000[node_name]["freq"]
-        # exp_logger.info(f"# node name: {node_name}, node type: {node_type}, node frequency: {node_freq}")
+    # exp_logger.info('''nodes whose frenquency is above ():''')
+    # for node_name in freqs:
+    #     node_type = freqs[node_name]["type"]
+    #     node_freq = freqs[node_name]["freq"]
+    #     exp_logger.info(f"# node name: {node_name}, node type: {node_type}, node frequency: {node_freq}")
 
     graph_path = "pipeline/stat"
     print(graph_path)
-    clipped_vis_idx = {k: min(v, 2000) for k, v in vis_idx.items()}
-    clipped_vis_token = {k: min(v, 2000) for k, v in vis_token.items()}
+    # clipped_vis_idx = {k: min(v, 2000) for k, v in vis_idx.items()}
+    # clipped_vis_token = {k: min(v, 2000) for k, v in vis_token.items()}
+    clipped_vis_idx = {k:v for k, v in vis_idx.items()}
+    clipped_vis_token = {k:v for k, v in vis_token.items()}
     _distribution_analysis('idx', vis_idx.values(), graph_path, output_file_name)
     _distribution_analysis('token', vis_token.values(), graph_path, output_file_name)
 

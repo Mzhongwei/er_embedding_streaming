@@ -3,8 +3,6 @@
 >python -m venv venv
 2. pip install -r requirements.txt
 
-[pipeline]
-1. pre-training model: main.py, configuration in file config
 
 [node type]
 Class	First	Root	Appears

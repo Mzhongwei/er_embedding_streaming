@@ -1,14 +1,14 @@
 ######### mandatory config (mandatory):
-# task operation available: "batch" (pre-training of stream), "smatch", "experiment"
+# task operation available: "batch" (pre-training of stream), "smatch", "evaluation"
 task:batch
 dataset_file:Data_example/fodors_zagats-tableA.csv
 
-######## optional config #########
+######### optional config #########
 output_file_name:fodors_zagats
-########## log config:
+### log config:
 log_path:pipeline/logging
 
-########## graph config:
+### graph config:
 # "tn": token as number, "tt": token as text, "idx": id of row, "cid": id of column
 # "$": string, "#": number
 # (1-7): class of this type of value, definition of different classes is written at file README
@@ -19,7 +19,7 @@ flatten:tt
 smoothing_method:no
 directed:false
 
-########### walks config:
+### walks config:
 write_walks:true
 # step size
 walk_length:60
@@ -30,7 +30,7 @@ backtrack:false
 # statistical overview/vis for random walk
 rw_stat:true
 
-########## Embeddings configuration:
+### Embeddings configuration:
 learning_method:skipgram
 window_size:3
 n_dimensions:300

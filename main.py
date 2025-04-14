@@ -12,7 +12,7 @@ with warnings.catch_warnings():
     warnings.simplefilter('ignore')
     from utils.utils import *
     from utils.write_log import write_log
-    from dataprocessing.experiments import compare_ground_truth
+    from dataprocessing.evaluation import compare_ground_truth
     from dynamic_embedding.dynamic_graph import dyn_graph_generation
     from dynamic_embedding.dynamic_embeddings import initialize_embeddings
     from dynamic_embedding.dynamic_sampling import dynrandom_walks_generation
@@ -101,7 +101,7 @@ def streaming_driver(configuration):
         if configuration['directed'] != graph.get_directed_info():
             raise ValueError(f"[directed] value setting in the config doesn't correspond to the graph attribute.")
         print(f"graph attributes: id_nums-{graph.get_id_nums()}, smooth method-{graph.get_smooth_method()}, directed-{graph.get_directed_info()}")
-        
+        configuration["source_num"] = graph.get_id_nums()
         ##### load model
         embeddings_file = configuration['embeddings_file']
         if configuration['training_algorithm'] == 'fasttext':
@@ -120,12 +120,13 @@ def streaming_driver(configuration):
                     training_algorithm=configuration['training_algorithm'],
                     learning_method=configuration['learning_method'],
                     sampling_factor=configuration['sampling_factor'])
+    configuration["source_num"] = graph.get_id_nums()
     ########### stream part ##############
     print('Streaming...')
     output_file_name = configuration['output_file_name']
     start_kafka_consumer(configuration, graph, model, output_file_name)
 
-def experimenting_driver(configuration):
+def evaluation_driver(configuration):
     compare_ground_truth(configuration)
 
 def read_configuration(config_file):
@@ -157,8 +158,8 @@ def full_run(config_dir, config_file):
 
     if configuration['task'] == 'smatch': # smatch : stream match
         streaming_driver(configuration)
-    elif configuration['task'] == 'experiment':
-        experimenting_driver(configuration)
+    elif configuration['task'] == 'evaluation':
+        evaluation_driver(configuration)
     elif configuration['task'] == "batch":
         batch_driver(configuration)
         
@@ -173,6 +174,7 @@ def main(file_path=None, dir_path=None, args=None):
     os.makedirs('pipeline/logging', exist_ok=True)
     os.makedirs('pipeline/graph', exist_ok=True)
     os.makedirs('pipeline/stat', exist_ok=True)
+    os.makedirs('pipeline/similarity', exist_ok=True)
 
     # Finding the configuration file paths.
     if args:

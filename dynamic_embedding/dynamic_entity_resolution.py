@@ -44,8 +44,8 @@ class FaissIndex:
         for dist, idx in zip(distances[0], indices[0]) :
             similar_word  = self.idx_to_filtered_word[idx]
             # print(similar_word)
-            # if similar_word != query_word and idx in self.idx_to_filtered_word and float(dist) > 0.5:
-            if similar_word != query_word and idx in self.idx_to_filtered_word:
+            if similar_word != query_word and idx in self.idx_to_filtered_word and float(dist) > 0.5:
+            # if similar_word != query_word and idx in self.idx_to_filtered_word:
                 # similar_words = [(similar_word, 1 / (1 + dist))]  # convert to similarity
                 similar_words.append((similar_word,  float(dist)))
 
@@ -106,8 +106,8 @@ class FaissIndex:
 def dynentity_resolution(model, target, n):
     filtered_keys = [word for word in model.wv.index_to_key if word.startswith("idx__")] # only search words beginning with "idx__"
     sims = []
-    # sims = [(word, score) for word, score in model.wv.most_similar(target, topn=n*10) if word in filtered_keys and score >0.5][:n]
-    sims = [(word, score) for word, score in model.wv.most_similar(target, topn=n*10) if word in filtered_keys][:n]
+    sims = [(word, score) for word, score in model.wv.most_similar(target, topn=n*10) if word in filtered_keys and score >0.5][:n]
+    # sims = [(word, score) for word, score in model.wv.most_similar(target, topn=n*10) if word in filtered_keys][:n]
     # sims = model.wv.most_similar(target, topn=10, restrict_vocab=len(filtered_keys))  # get other similar words
     return sims   
     
