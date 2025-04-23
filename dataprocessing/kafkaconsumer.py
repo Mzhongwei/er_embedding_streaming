@@ -24,12 +24,12 @@ class ConsumerService:
         self.config = configuration
         self.graph = graph
         self.model = model
-        self.strategy_suppl = configuration["strategy_suppl"]
+        self.strategy_suppl = configuration["similarity_list"]["strategy_suppl"]
         self.strategy_model = None
         self.output_file_name = output_file_name
         self.sim_list = SimilarityList(
-                            configuration["simlist_n"],
-                            configuration["output_format"]
+                            configuration["similarity_list"]["simlist_n"],
+                            configuration["similarity_list"]["output_format"]
                         )
         self.window_data = deque()
         self.last_update_time = time.time()
@@ -48,9 +48,9 @@ class ConsumerService:
         self.t_end_time = None
 
     def _setup_logging(self):
-        self.app_logger = write_log(self.config["log_path"], "app", "app")
-        self.kafka_logger = write_log(self.config["log_path"], "kafka", "kafka")
-        self.debug_logger = write_log(self.config["log_path"], "debug", "debug")
+        self.app_logger = write_log(self.config["log"]["path"], "app", "app")
+        self.kafka_logger = write_log(self.config["log"]["path"], "kafka", "kafka")
+        self.debug_logger = write_log(self.config["log"]["path"], "debug", "debug")
 
         self.sim_list.set_logger(self.app_logger)
 
@@ -79,9 +79,9 @@ class ConsumerService:
         for target in tqdm(df.loc[:,"rid"], desc= "# build similarity list. "):
             try:
                 if self.strategy_suppl == "basic":
-                    similar = dynentity_resolution(self.model, target, self.config["top_k"])
+                    similar = dynentity_resolution(self.model, target, self.config["similarity_list"]["top_k"])
                 elif self.strategy_suppl == "faiss":
-                    similar = self.strategy_model.get_similar_words([self.model.wv[target]], target, self.config["top_k"])
+                    similar = self.strategy_model.get_similar_words([self.model.wv[target]], target, self.config["similarity_list"]["top_k"])
 
                 if int(self.config['source_num']) > 0 and similar != []:
                     similar = self._filter_list(similar)
@@ -169,7 +169,7 @@ class ConsumerService:
             # self.model.wv.save_word2vec_format(f"pipeline/embeddings/{self.output_file_name}.emb", binary=False) # Saves in binary format by default
             print("Model saved!")
 
-            if self.config["rw_stat"] == True:
+            if self.config["walks"]["rw_stat"] == True:
                 print(f"drawing... Distribution of random walk visit values: {self.output_file_name}")
                 random_walk_analysis(self.graph, self.output_file_name)
                 print("Graph Ok!")
@@ -197,10 +197,10 @@ class ConsumerService:
         try:
             # prepare kafka consumer
             consumer = KafkaConsumer(
-                self.config['kafka_topicid'],
-                bootstrap_servers=f'{self.config["bootstrap_servers"]}:{self.config["port"]}',
+                self.config['kafka']['topicid'],
+                bootstrap_servers=f'{self.config["kafka"]["bootstrap_servers"]}:{self.config["kafka"]["port"]}',
                 value_deserializer=lambda x: json.loads(x.decode('utf-8')),
-                group_id=self.config["kafka_groupid"],
+                group_id=self.config['kafka']["groupid"],
                 enable_auto_commit=True
             )
         except Exception as e:
@@ -243,9 +243,9 @@ class ConsumerService:
                         self.data_buffer.append(metadata)
 
                         ## Handle (time or count based) windowing
-                        if self.config["window_strategy"] == "time":
+                        if self.config["kafka"]["window_strategy"] == "time":
                             self._handle_time_window(metadata, current_time)
-                        elif self.config["window_strategy"] == "count":
+                        elif self.config["kafka"]["window_strategy"] == "count":
                             self._handle_count_window(metadata)
                         
 
@@ -262,12 +262,12 @@ class ConsumerService:
         metadata["timestamp"] = current_time
         self.window_data.append(metadata)
 
-        if current_time - self.last_update_time >= self.config["update_frequency"]:
+        if current_time - self.last_update_time >= self.config["kafka"]["update_frequency"]:
             self._process_window()
             self.last_update_time = current_time
         
             # clear window
-            if self.config["update_frequency"] != 0:
+            if self.config["kafka"]["update_frequency"] != 0:
                 self._remove_expired_data(current_time)
             else: 
                 self.window_data.clear()
@@ -275,13 +275,13 @@ class ConsumerService:
     def _handle_count_window(self, metadata):
         self.window_data.append(metadata)
 
-        if len(self.window_data) >= self.config["window_count"]:
+        if len(self.window_data) >= self.config["kafka"]["window_count"]:
 
             self._process_window()
 
             # clear window
-            if self.config["update_frequency"] != 0:
-                for _ in range(self.config["update_frequency"]):
+            if self.config["kafka"]["update_frequency"] != 0:
+                for _ in range(self.config["kafka"]["update_frequency"]):
                     if self.window_data:
                         self.window_data.popleft()
             else:

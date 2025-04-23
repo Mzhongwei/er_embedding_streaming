@@ -126,7 +126,7 @@ class DynGraphIgraph:
         # ## END method1
 
         ## method2: add new node anyway
-            if node_prefix == "cid":
+            if node_prefix == "cid" or node_prefix == "idx":
                 try:
                     node = self.graph.vs.find(name=node_name)
                     node["frequency_in_graph"] = node["frequency_in_graph"] + 1
@@ -296,14 +296,14 @@ class DynGraphIgraph:
                         og_value = row[cid_node]
                         # Convert cell values to strings, None or list.
                         token_list, is_numeric = convert_token_value(og_value)
-
-                        for el in token_list:
-                            if is_numeric:
-                                node_prefix = "tn"
-                            else:
-                                node_prefix = "tt"
-                            instance_index = self._update_instance_vertex_edge(cid_index, rid_index, el, node_prefix)
-                            affected_nodes.update(instance_index)
+                        if token_list is not None:
+                            for el in token_list:
+                                if is_numeric:
+                                    node_prefix = "tn"
+                                else:
+                                    node_prefix = "tt"
+                                instance_index = self._update_instance_vertex_edge(cid_index, rid_index, el, node_prefix)
+                                affected_nodes.update(instance_index)
                     except KeyError:
                         continue
         
@@ -348,10 +348,10 @@ def dyn_graph_generation(configuration):
     :param configuration: dictionary with all the run parameters
     :return: the generated graph
     """
-    if 'flatten' in configuration and configuration['flatten']:
-        if configuration['flatten'].lower() not in ['all', 'false']:
-            flatten = configuration['flatten'].strip().split(',')
-        elif configuration['flatten'].lower() == 'false':
+    if 'flatten' in configuration and configuration['graph']['flatten']:
+        if configuration['graph']['flatten'].lower() not in ['all', 'false']:
+            flatten = configuration['graph']['flatten'].strip().split(',')
+        elif configuration['graph']['flatten'].lower() == 'false':
             flatten = []
         else:
             flatten = 'all'
@@ -361,9 +361,9 @@ def dyn_graph_generation(configuration):
     t_start = datetime.datetime.now()
     print(OUTPUT_FORMAT.format('Starting graph construction', t_start.strftime(TIME_FORMAT)))
 
-    node_types = configuration["node_types"]
-    directed = configuration["directed"]
-    smooth = configuration["smoothing_method"]
+    node_types = configuration['graph']['node_types']
+    directed = configuration['graph']['directed']
+    smooth = configuration['graph']['smoothing_method']
     g = DynGraphIgraph(node_types=node_types, flatten=flatten, directed=directed, smooth=smooth)
     t_end = datetime.datetime.now()
     dt = t_end - t_start

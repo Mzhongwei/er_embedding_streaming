@@ -84,9 +84,9 @@ def dynrandom_walks_generation(configuration, graph):
     :return: the collection of random walks
     """
     sentences = []
-    walk_length = int(configuration["walk_length"])
-    backtrack = configuration["backtrack"]
-    walks_number = configuration["walks_number"]
+    walk_length = int(configuration['walks']['walk_length'])
+    backtrack = configuration['walks']['backtrack']
+    walks_number = configuration['walks']['walks_number']
 
     roots_index = graph.dyn_roots
     
@@ -94,7 +94,7 @@ def dynrandom_walks_generation(configuration, graph):
     # ########### Random walks ############
     sentence_counter = 0
     if walks_number > 0:
-        pbar = tqdm(desc="# Sentence generation progress: ", total=len(roots_index)*configuration['walks_number'])
+        pbar = tqdm(desc="# Sentence generation progress: ", total=len(roots_index)*configuration['walks']['walks_number'])
         for root in roots_index:
             # if cell in intersection:
             ######## random walk for each node
@@ -119,7 +119,7 @@ def dynrandom_walks_generation(configuration, graph):
                 else:
                     raise ValueError(f"random walk anormal")
 
-            if configuration["write_walks"]:
+            if configuration['walks']['write_walks']:
                 if len(r) > 0:
                     ws = [" ".join(_) for _ in r]
                     s = "\n".join(ws) + "\n"

@@ -17,6 +17,7 @@ class FaissIndex:
         idx = 0  # FAISS internal index
         for word in model.wv.index_to_key:
             if word.startswith("idx__"):
+                print(f"id in model: {word}, id in index: {idx}")
                 vector = model.wv[word]
                 word_vectors.append(vector)
                 self.filtered_word_to_idx[word] = idx
@@ -42,11 +43,12 @@ class FaissIndex:
         # FAISS returns the L2 distance, which needs to be converted to similarity
         # cosine sim = 1 / (1 + L2_distance)
         for dist, idx in zip(distances[0], indices[0]) :
+            print(f"search id: {idx}")
             similar_word  = self.idx_to_filtered_word[idx]
             # print(similar_word)
             if similar_word != query_word and idx in self.idx_to_filtered_word and float(dist) > 0.5:
             # if similar_word != query_word and idx in self.idx_to_filtered_word:
-                # similar_words = [(similar_word, 1 / (1 + dist))]  # convert to similarity
+                # similar_words = [(similar_worcd, 1 / (1 + dist))]  # convert to similarity
                 similar_words.append((similar_word,  float(dist)))
 
         return similar_words
@@ -110,11 +112,3 @@ def dynentity_resolution(model, target, n):
     # sims = [(word, score) for word, score in model.wv.most_similar(target, topn=n*10) if word in filtered_keys][:n]
     # sims = model.wv.most_similar(target, topn=10, restrict_vocab=len(filtered_keys))  # get other similar words
     return sims   
-    
-
-
-# if __name__ == '__main__':
-#     configuration = read_configuration('/home/zhongwei/Data_ingestion/embIng/config/config-stream')
-#     embeddings_file = "pipeline/embeddings/papers.emb"
-#     model = Word2Vec.load(embeddings_file) 
-#     dynentity_resolution(model, configuration, 'test', None)

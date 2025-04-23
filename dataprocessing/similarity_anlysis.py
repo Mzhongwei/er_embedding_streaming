@@ -1,6 +1,6 @@
 from matplotlib import pyplot as plt
 
-def similarity_analysis(sim_list, actual_matches, output_file_name):
+def similarity_analysis(sim_list, actual_matches, output_file_name, k_first):
     x_vals_red = []
     y_vals_red = []
     x_vals_blue = []
@@ -16,11 +16,11 @@ def similarity_analysis(sim_list, actual_matches, output_file_name):
             else:
                 el = (record_num, item)
             if el in actual_matches:
-                x_vals_red.append(item)
+                x_vals_red.append(el[0])
                 y_vals_red.append(sim_degree)
                 # point: (x:item, y:sim_degree) color: red 
             else:
-                x_vals_blue.append(item)
+                x_vals_blue.append(el[0])
                 y_vals_blue.append(sim_degree) 
                 # point: (x:item, y:sim_degree) color: blue
     
@@ -35,6 +35,6 @@ def similarity_analysis(sim_list, actual_matches, output_file_name):
     plt.grid(True)
     plt.tight_layout()
 
-    plt.savefig(f"pipeline/stat/sim_degree-{output_file_name}.png", dpi=300)
+    plt.savefig(f"pipeline/stat/sim_degree-{output_file_name}-{k_first}.png", dpi=300)
 
     plt.show()

@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from pathlib import Path
 import sqlite3
 import math
@@ -113,7 +114,6 @@ def _get_similar_pairs(data_dict, n, appr):
             # value ex. [[0.8194172382354736, 'idx__38260'], [0.8130440711975098, 'idx__51652']]
             if isinstance(item, list):
                 item_matching = item[1]
-                print(item_matching)
                 item_matching = int(item_matching.split('__')[1])
 
             # sort: facilitate deplication
@@ -153,19 +153,16 @@ def compare_ground_truth(configuration):
     matches = _get_ground_truth(ground_truth_file)
 
     correct_matches = 0
-    predicted_matches = _get_similar_pairs(similarity_list, int(configuration['n_first']), int(configuration['approximate']))
+    predicted_matches = _get_similar_pairs(similarity_list, int(configuration['eva']['n_first']), int(configuration['eva']['n_first']))
     actual_matches = _get_match_pairs(matches)
 
     total_predicted_matches = len(predicted_matches)
-    print(total_predicted_matches)
     total_relevant_matches = len(actual_matches)
-    print(total_relevant_matches)
     correct_matches =  len(set(predicted_matches) & set(actual_matches)) 
-    print(correct_matches)
 
-    if configuration['sim_vis'] == "true":
-        sim_list = _get_similarity_pairs_with_degree(similarity_list, int(configuration['n_first']), int(configuration['approximate']))
-        similarity_analysis(sim_list, actual_matches, configuration['output_file_name'])
+    if configuration['eva']['n_first'] == True:
+        sim_list = _get_similarity_pairs_with_degree(similarity_list, int(configuration['eva']['n_first']), int(configuration['eva']['n_first']))
+        similarity_analysis(sim_list, actual_matches, configuration['output_file_name'], int(configuration['eva']['n_first']))
     # Precision: Number of correct matches / Total predicted matches
     precision = correct_matches / total_predicted_matches if total_predicted_matches != 0 else 0.0
     # Recall: Number of correct matches / Total relevant matches
@@ -177,9 +174,9 @@ def compare_ground_truth(configuration):
 
     # output results to log file
     dir_name = "evaluation"
-    Path(f'''{configuration["log_path"]}/{dir_name}''').mkdir(parents=True, exist_ok=True)
-    logger = write_log(f'''{configuration["log_path"]}''', dir_name, dir_name)
+    Path(f'''{configuration['log']['path']}/{dir_name}''').mkdir(parents=True, exist_ok=True)
+    logger = write_log(f'''{configuration['log']['path']}''', dir_name, dir_name)
     
-    logger.info(f'''[RESULTS] Evaluation result of similarity list in file [{similarity_file}] by taking records with top {configuration["n_first"]} similarity and the similarity retains {configuration['approximate']} decimal places: \n correct matches: {correct_matches} \n total number of predicted matches: {total_predicted_matches} \n total number of matches in groud truth file: {total_relevant_matches} \n \n precision: {precision} \n recall: {recall} \n f1 score: {f1_score}''')
+    logger.info(f'''[RESULTS] Evaluation result of similarity list in file [{similarity_file}] by taking records with top {configuration["eva"]["n_first"]} similarity and the similarity retains {configuration['eva']['n_first']} decimal places: \n correct matches: {correct_matches} \n total number of predicted matches: {total_predicted_matches} \n total number of matches in groud truth file: {total_relevant_matches} \n \n precision: {precision} \n recall: {recall} \n f1 score: {f1_score}''')
     
     # return precision, recall, f1_score

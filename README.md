@@ -39,7 +39,7 @@ This process constructs a graph according to a relational table formatted as a c
 - Input file: dataset file, setted up with variable name `dataset_file`.
 - Output files: graph file `.graphml` and embedding `.emb`, stored respectively in path `pipeline/graph` and `pipeline/embeddings`, which can be used in the streaming process as pre-training input variables. 
 
-For testing pre-training process, pls run `python main.py -f config/config-batch` 
+For testing pre-training process, pls run `python main.py -f Config_example/config-batch` 
 
 ### Streaming Pipeline
 This process captures real-time data from kafka and performs entity resolution tasks incrementally. The incremental window can be count-based or time-based and is set in config file.
@@ -48,12 +48,12 @@ This process captures real-time data from kafka and performs entity resolution t
     - With input files: uses both graph file `.graphml` and embedding file `.emb` generated from pre-training process
 - Output file: similarity results and predictions stored as a `.db` file in the `pipeline/similarity` directory.
 
-For testing streaming process, pls run `python main.py -f config/config-stream` 
+For testing streaming process, pls run `python main.py -f Config_example/config-stream` 
 
 ### Evaluation
-We provide 3 metrics for the evaluation: precision, recall and f1-score. All evaluation results are logged in `pipeline/evaluation/evaluation.log`
+We provide 3 metrics for the evaluation: precision, recall and f1-score. All evaluation results output to the terminal and simultaneously logged in `pipeline/evaluation/evaluation.log`.
 
-For verifying the results of the experiment, pls run `python main.py -f config/config-evaluation`
+For verifying the results of the experiment, pls run `python main.py -f Config_example/config-evaluation`
 
 ## ANNEXES
 ### default values list:
@@ -78,7 +78,7 @@ For verifying the results of the experiment, pls run `python main.py -f config/c
 | top_k| 10 | 
 | simlist_n| 10 | 
 | simlist_show| 5 | 
-| strategy_suppl| "faiss" | 
+| strategy_suppl| "basic" | 
 | output_format| "db" | 
 | kafka_topicid| "entity_resolution_process" | 
 | kafka_groupid| "er_group" | 
@@ -90,3 +90,8 @@ For verifying the results of the experiment, pls run `python main.py -f config/c
 | n_first|  3 | 
 | approximate|  16 | 
 | sim_vis|  True | 
+
+### node types
+- "tn": token as number, "tt": token as text, "idx": id of row, "cid": id of column
+- "$": string, "#": number
+- (1-7): class of this type of value, definition of different classes is written at file README

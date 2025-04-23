@@ -2,6 +2,9 @@ import argparse
 import ast
 import datetime
 import json
+from pathlib import Path
+from ruamel.yaml import YAML
+
 import warnings
 
 from gensim.models import FastText, Word2Vec
@@ -29,7 +32,7 @@ def parse_args():
     return args
 
 def batch_driver(configuration):
-    config_logger = write_log(configuration['log_path'], "config", "batch")
+    config_logger = write_log(configuration['log']['path'], "config", "batch")
     print(f"Saving configuration setting in log file...")
     config_logger.info(f"Configuration for batch test: {json.dumps(configuration)}")
     print('Config saved!')
@@ -51,18 +54,17 @@ def batch_driver(configuration):
     print(f"dyn roots len: {len(graph.dyn_roots)}")
 
     # random walk
-    configuration['walks_number'] = int(configuration["walks_number"])
     walks = dynrandom_walks_generation(configuration, graph)
     
     # training model
     embeddings_file = f"pipeline/embeddings/{configuration['output_file_name']}.emb"
     print("create a new model...")
-    model = initialize_embeddings(write_walks=configuration['write_walks'],
-                dimensions=int(configuration['n_dimensions']),
-                window_size=int(configuration['window_size']),
-                training_algorithm=configuration['training_algorithm'],
-                learning_method=configuration['learning_method'],
-                sampling_factor=configuration['sampling_factor'])
+    model = initialize_embeddings(write_walks=configuration['walks']['write_walks'],
+                dimensions=configuration['embeddings']['n_dimensions'],
+                window_size=configuration['embeddings']['window_size'],
+                training_algorithm=configuration['embeddings']['training_algorithm'],
+                learning_method=configuration['embeddings']['learning_method'],
+                sampling_factor=configuration['embeddings']['sampling_factor'])
     print("start training...")
     model.build_vocab(walks)
     model.train(walks, total_examples=model.corpus_count, epochs=10)
@@ -78,7 +80,7 @@ def streaming_driver(configuration):
     Once the initiation finishes, driver will call kafka consumerwhich receives the data and performs the task ER
 
     '''
-    config_logger = write_log(configuration['log_path'], "config", "stream")
+    config_logger = write_log(configuration['log']['path'], "config", "stream")
     print(f"Saving configuration setting in log file...")
     config_logger.info(f"Configuration for batch test: {json.dumps(configuration)}")
     print('Config saved!')
@@ -86,8 +88,7 @@ def streaming_driver(configuration):
     ########### init #########
     ##### load edgelist
     graph_file = configuration['graph_file']
-    configuration['walks_number'] = int(configuration["walks_number"])
-    print("walks_number stream", configuration['walks_number'])
+    print("walks_number stream", configuration['walks']['walks_number'])
 
     ##### generate empty Graph
     graph = dyn_graph_generation(configuration)
@@ -96,15 +97,15 @@ def streaming_driver(configuration):
         ##### load graph
         graph.load_graph(graph_file)
         # check configuration with graph properties
-        if configuration['smoothing_method'] != graph.get_smooth_method():
+        if configuration['graph']['smoothing_method'] != graph.get_smooth_method():
             raise ValueError(f"smooth method setting in the config doesn't correspond to the graph attribute.")
-        if configuration['directed'] != graph.get_directed_info():
+        if configuration['graph']['directed'] != graph.get_directed_info():
             raise ValueError(f"[directed] value setting in the config doesn't correspond to the graph attribute.")
         print(f"graph attributes: id_nums-{graph.get_id_nums()}, smooth method-{graph.get_smooth_method()}, directed-{graph.get_directed_info()}")
         configuration["source_num"] = graph.get_id_nums()
         ##### load model
         embeddings_file = configuration['embeddings_file']
-        if configuration['training_algorithm'] == 'fasttext':
+        if configuration['embeddings']['window_size'] == 'fasttext':
             print('load fasttext model...')
             model = FastText.load(embeddings_file)
         else:
@@ -114,12 +115,12 @@ def streaming_driver(configuration):
         print(f"graph attributes: id_nums-{graph.get_id_nums()}, smooth method-{graph.get_smooth_method()}, directed-{graph.get_directed_info()}")
         ###### create an empty model
         print("Create a new model...")
-        model = initialize_embeddings(write_walks=configuration['write_walks'],
-                    dimensions=int(configuration['n_dimensions']),
-                    window_size=int(configuration['window_size']),
-                    training_algorithm=configuration['training_algorithm'],
-                    learning_method=configuration['learning_method'],
-                    sampling_factor=configuration['sampling_factor'])
+        model = initialize_embeddings(write_walks=configuration['walks']['write_walks'],
+                    dimensions=configuration['embeddings']['n_dimensions'],
+                    window_size=configuration['embeddings']['window_size'],
+                    training_algorithm=configuration['embeddings']['training_algorithm'],
+                    learning_method=configuration['embeddings']['learning_method'],
+                    sampling_factor=configuration['embeddings']['sampling_factor'])
     configuration["source_num"] = graph.get_id_nums()
     ########### stream part ##############
     print('Streaming...')
@@ -146,15 +147,21 @@ def read_configuration(config_file):
                 config[key] = value
     return config
 
+def load_yaml_config(config_file):
+    yaml = YAML()
+    with open(config_file, 'r') as f:
+        config = yaml.load(f)
+    return config
+
 
 def full_run(config_dir, config_file):
     # Parsing the configuration file.
-    configuration = read_configuration(config_dir + '/' + config_file)
+    path = Path(config_dir, config_file)
+    configuration = load_yaml_config(path)
     # Checking the correctness of the configuration, setting default values for missing values.
     configuration = check_config_validity(configuration)
 
     # Running the task specified in the configuration file.
-
 
     if configuration['task'] == 'smatch': # smatch : stream match
         streaming_driver(configuration)
@@ -192,19 +199,17 @@ def main(file_path=None, dir_path=None, args=None):
 
     # Extracting valid files
     if config_dir:
-        # TODO: clean this up, use Path
-        valid_files = [_ for _ in os.listdir(config_dir) if not _.startswith('default')
-                       and not os.path.isdir(config_dir + '/' + _)]
+        config_dir = Path(config_dir)
+        valid_files = []
+        for f in config_dir.iterdir():
+            if f.is_file() and not f.name.startswith('default'):
+                valid_files.append(f.name)
         n_files = len(valid_files)
-        print('Found {} files'.format(n_files))
+        print(f'Found {n_files} files in {config_dir}')
     elif config_file:
-        if args:
-            valid_files = [os.path.basename(args.config_file)]
-            config_dir = os.path.dirname(args.config_file)
-        else:
-            valid_files = [os.path.basename(config_file)]
-            config_dir = os.path.dirname(config_file)
-
+        config_path = Path(args.config_file if args else config_file)
+        config_dir = config_path.parent
+        valid_files = [config_path.name]
     else:
         raise ValueError('Missing file_path or config_path.')
 
@@ -213,8 +218,8 @@ def main(file_path=None, dir_path=None, args=None):
         for idx, file in enumerate(sorted(valid_files)):
             try:
                 print('#' * 80)
-                print('# File {} out of {}'.format(idx + 1, len(valid_files)))
-                print('# Configuration file: {}'.format(file))
+                print(f'# File {idx + 1} out of {valid_files}')
+                print(f'# Configuration file: {file}')
                 t_start = datetime.datetime.now()
                 print(OUTPUT_FORMAT.format('Starting run.', t_start.strftime(TIME_FORMAT)))
                 print()
@@ -231,8 +236,8 @@ def main(file_path=None, dir_path=None, args=None):
     else:
         for idx, file in enumerate(sorted(valid_files)):
             print('#' * 80)
-            print('# File {} out of {}'.format(idx + 1, len(valid_files)))
-            print('# Configuration file: {}'.format(file))
+            print(f'# File {idx + 1} out of {valid_files}')
+            print(f'# Configuration file: {file}')
             t_start = datetime.datetime.now()
             print(OUTPUT_FORMAT.format('Starting run.', t_start.strftime(TIME_FORMAT)))
             print()

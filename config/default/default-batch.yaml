@@ -1,0 +1,29 @@
+output_file_name: "test"
+
+log:
+  path: "pipeline/logging"
+
+graph:
+  # node types explained in README
+  node_types:
+    - "7#__tn"
+    - "7$__tt"
+    - "3$__idx"
+    - "1$__cid"
+  flatten: "no"                  # split prefix for nodes
+  smoothing_method: "no"         # smooth method: log/no
+  directed: false                # whether the graph is directed
+
+walks:
+  write_walks: true
+  walk_length: 60                # step size
+  walks_number: 20               # number of sentences per root
+  backtrack: false               # whether to allow return to previous node
+  rw_stat: true                  # statistical result of random walk
+
+embeddings:
+  learning_method: "skipgram"    # skipgram / CBOW
+  window_size: 3
+  n_dimensions: 300
+  training_algorithm: "word2vec" # word2vec / fasttext
+  sampling_factor: 0.001
