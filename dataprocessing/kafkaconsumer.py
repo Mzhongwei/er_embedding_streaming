@@ -21,6 +21,7 @@ task_queue = queue.Queue()
     
 class ConsumerService:
     def __init__(self, configuration, graph, model, output_file_name, metrics):
+        self.consumer = None
         self.config = configuration
         self.graph = graph
         self.model = model
@@ -196,7 +197,7 @@ class ConsumerService:
     def run(self):
         try:
             # prepare kafka consumer
-            consumer = KafkaConsumer(
+            self.consumer = KafkaConsumer(
                 self.config['kafka']['topicid'],
                 bootstrap_servers=f'{self.config["kafka"]["bootstrap_servers"]}:{self.config["kafka"]["port"]}',
                 value_deserializer=lambda x: json.loads(x.decode('utf-8')),
@@ -211,7 +212,7 @@ class ConsumerService:
         self.app_logger.info("Start Kafka consumer...")
 
         while True:
-            msg_pack = consumer.poll(timeout_ms=100)  # Non-blocking batch pull
+            msg_pack = self.consumer.poll(timeout_ms=100)  # Non-blocking batch pull
 
             for tp, messages in msg_pack.items():
                 for msg in messages:
@@ -224,7 +225,7 @@ class ConsumerService:
                         ## Update metrics
                         # Update lag
                         try:
-                            latest_offset = consumer.end_offsets([tp])[tp]
+                            latest_offset = self.consumer.end_offsets([tp])[tp]
                             lag = latest_offset - msg.offset
                             self.metrics.update_lag_metrics(lag)
                         except Exception as lag_err:
@@ -310,9 +311,14 @@ def start_kafka_consumer(configuration, graph, model, output_file_name):
     # check output path
     consumer.sim_list.check_output_path(output_file_name)
     if consumer.sim_list.output_format != "db":
-            consumer.flag_running = True
-            consumer.trigger_file_write()
-    consumer.run()
+        consumer.flag_running = True
+        consumer.trigger_file_write()
+    
+    try:
+        consumer.run()
+    except KeyboardInterrupt:
+            consumer.consumer.close()
+            print(f"-----------------Exiting program-------------------")
 
 if __name__ == '__main__':
     # consumer_service(configuration, graph, wv)

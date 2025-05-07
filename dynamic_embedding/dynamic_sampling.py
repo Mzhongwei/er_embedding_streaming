@@ -98,7 +98,7 @@ def dynrandom_walks_generation(configuration, graph):
         for root in roots_index:
             # if cell in intersection:
             ######## random walk for each node
-            r = []
+            walks = []
             for _r in range(walks_number):
                 try:
 
@@ -115,18 +115,18 @@ def dynrandom_walks_generation(configuration, graph):
                     break
                 
                 if w.get_walk() != []:
-                    r.append(w.get_walk())
+                    walks.append(w.get_walk())
                 else:
                     raise ValueError(f"random walk anormal")
 
             if configuration['walks']['write_walks']:
-                if len(r) > 0:
-                    ws = [" ".join(_) for _ in r]
+                if len(walks) > 0:
+                    ws = [" ".join(_) for _ in walks]
                     s = "\n".join(ws) + "\n"
                     walk_info.info(s)
                 else:
                     pass
-            sentences += r
+            sentences += walks
             sentence_counter += walks_number
            
             pbar.update(walks_number)

@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg') 
 from matplotlib import pyplot as plt
 
 def similarity_analysis(sim_list, actual_matches, output_file_name, k_first):
@@ -37,4 +39,5 @@ def similarity_analysis(sim_list, actual_matches, output_file_name, k_first):
 
     plt.savefig(f"pipeline/stat/sim_degree-{output_file_name}-{k_first}.png", dpi=300)
 
-    plt.show()
+    # plt.show()
+    plt.close()

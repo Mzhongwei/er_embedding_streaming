@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib
+matplotlib.use('Agg') 
 from matplotlib import pyplot as plt
 from scipy import stats
 from utils.write_log import write_log
@@ -151,4 +153,5 @@ def random_walk_analysis(graph, output_file_name):
     plt.legend()
     plt.savefig(f"{graph_path}/token-{output_file_name}.png", dpi=300) 
 
-    plt.show(block=False)
+    # plt.show(block=False)
+    plt.close()
