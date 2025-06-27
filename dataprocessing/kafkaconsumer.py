@@ -1,6 +1,10 @@
 import json
 import queue
+import signal
+import socket
+import sys
 from threading import Timer
+from datetime import datetime
 import threading
 import pandas as pd
 import time
@@ -10,15 +14,18 @@ import traceback
 
 from prometheus_client import start_http_server
 from tqdm import tqdm
+from comparison_approaches.exact_matching_copy import preprocessing_incremental
+from dataprocessing.similaritygraph import SimilarityGraph
 from dynamic_embedding.dynamic_sampling import dynrandom_walks_generation
 from dynamic_embedding.dynamic_entity_resolution import dynentity_resolution, FaissIndex
 from dataprocessing.similaritylist import SimilarityList
 from dataprocessing.metrics import Metrics
 from dataprocessing.random_walk_analysis import random_walk_analysis
 from utils.write_log import write_log
+from utils.utils import TIME_FORMAT
 
 task_queue = queue.Queue()
-    
+consumer = None
 class ConsumerService:
     def __init__(self, configuration, graph, model, output_file_name, metrics):
         self.consumer = None
@@ -28,26 +35,34 @@ class ConsumerService:
         self.strategy_suppl = configuration["similarity_list"]["strategy_suppl"]
         self.strategy_model = None
         self.output_file_name = output_file_name
-        self.sim_list = SimilarityList(
-                            configuration["similarity_list"]["simlist_n"],
-                            configuration["similarity_list"]["output_format"]
-                        )
+        
         self.window_data = deque()
         self.last_update_time = time.time()
         self.data_buffer = []
         self.flag_running = False
         self.write_timer = None
-        self.time_interval = 2 # 300 seconds = 5 minutes
+        self.time_interval = 120 # 300 seconds = 5 minutes
         self.app_logger = None
         self.kafka_logger = None
         self.debug_logger = None
         self.metrics = metrics
-        self._setup_logging()
-        self.timeout = 60 # 60 (s)
+        
+        self.timeout = 20 # (s)
         self.timer = None
         self.t_start_time = None
         self.t_end_time = None
 
+        if configuration["similarity_list"]["sim_structure"] == "list":
+            self.sim_list = SimilarityList(
+                            configuration["similarity_list"]["simlist_n"],
+                            configuration["similarity_list"]["output_format"]
+                        )
+        elif configuration["similarity_list"]["sim_structure"] == "graph":
+            self.sim_list = SimilarityGraph(
+                            configuration["similarity_list"]["simlist_n"],
+                            configuration["similarity_list"]["output_format"]
+                            )
+        self._setup_logging()
     def _setup_logging(self):
         self.app_logger = write_log(self.config["log"]["path"], "app", "app")
         self.kafka_logger = write_log(self.config["log"]["path"], "kafka", "kafka")
@@ -74,10 +89,12 @@ class ConsumerService:
         df = pd.DataFrame.from_records(data_list)
         return df
 
-    def build_matching_list(self, df):
+    def build_matching_list(self, df, last_win):
         '''build sim list and output to db file'''
         # get similar words 
         for target in tqdm(df.loc[:,"rid"], desc= "# build similarity list. "):
+            time_start = datetime.now()
+            print(f"[ExecTime] probabilistic comparison starts ....................{time_start.strftime(TIME_FORMAT)}")
             try:
                 if self.strategy_suppl == "basic":
                     similar = dynentity_resolution(self.model, target, self.config["similarity_list"]["top_k"])
@@ -86,66 +103,109 @@ class ConsumerService:
 
                 if int(self.config['source_num']) > 0 and similar != []:
                     similar = self._filter_list(similar)
-                
+
+                time_end = datetime.now()
+                print(f"[ExecTime] probabilistic comparison starts ....................{time_end.strftime(TIME_FORMAT)}")
+                print(f"[ExecTime] probabilistic comparison time-------------------{time_end - time_start}")
+
+                print(f"[ExecTime] building list/graph starts ....................{time_end.strftime(TIME_FORMAT)}")
                 if similar != [] and similar is not None:
                     self.sim_list.add_similarity(target, similar)
 
-                    if self.sim_list.output_format == "db":
-                        # print(target)
-                        self.sim_list.insert_data(target)
-                    # print(self.sim_list.get_similarity_words_with_score(target, self.config["simlist_show"]))
-                    for word, score in similar:
-                        self.sim_list.add_similarity(word, [(target, score)])
-                        if self.sim_list.output_format == "db":
+                    # if self.sim_list.output_format == "db":
+                    #     self.sim_list.insert_data(target)
+                    if self.config["similarity_list"]["sim_structure"] == "list":
+                        for word, score in similar:
+                            self.sim_list.add_similarity(word, [(target, score)])
+                            # if self.sim_list.output_format == "db":
+                            #     self.sim_list.insert_data(word)
+                    if self.config["similarity_list"]["sim_structure"] == "graph" and self.sim_list.output_format == "db":
+                        for word, score in similar:
                             self.sim_list.insert_data(word)
                 else:
                     pass
+                time_end_1 = datetime.now()
+                print(f"[ExecTime] building list/graph starts ....................{time_end_1.strftime(TIME_FORMAT)}")
+                print(f"[ExecTime] building list/graph time-------------------{time_end_1 - time_end}")
             except Exception as e:
                 self.app_logger.error(f"Error similarity building: {str(e)}")
                 self.debug_logger.error(traceback.print_exc())
                 print(f"Error similarity building: {str(e)}")
+
+        if not last_win:
+            print(f"Waiting for the next data window...")
         print()
                 
 
     def process_window_data(self):
         """Process data of the current window """
         print("processing window data...")
-        self.timer.cancel()
+        # self.timer.cancel()
         
         # data preparation
         df = self._prepare_data(self.window_data)
-        # add new node to graph
-        self.graph.build_relation(df)
-        print(f"# roots numbers: {len(self.graph.dyn_roots)}")
-        # start random walk for new data
-        walks = dynrandom_walks_generation(self.config, self.graph)
 
-        if walks == []:
-            raise ValueError(f"Random walk anomaly")
+        # preprocessing exact matching for increments
+        time_start = datetime.now()
+        print(f"[ExecTime] preprocessing starts ....................{time_start.strftime(TIME_FORMAT)}")
+        df = self._em_inc(df)
+        time_end = datetime.now()
+        print(f"[ExecTime] preprocessing ends ....................{time_end.strftime(TIME_FORMAT)}")
+        print(f"[ExecTime] preprcessing time-------------------{time_end - time_start}")
+        
+        if not df.empty:
+            # add new node to outputfile
+            time_start = datetime.now()
+            print(f"[ExecTime] graph construction starts ....................{time_start.strftime(TIME_FORMAT)}")
+            self.graph.build_relation(df)
+            time_end = datetime.now()
+            print(f"[ExecTime] graph construction ends ....................{time_end.strftime(TIME_FORMAT)}")
+            print(f"[ExecTime] graph construction time---------------{time_end - time_start}")
+            print(f"# roots numbers: {len(self.graph.dyn_roots)}")
 
-        try:
-            print("# Retraining embeddings model by window data...")
-            if len(self.model.wv.key_to_index) == 0:
-                # initiate model
-                self.model.build_vocab(walks)
-                self.model.train(walks, total_examples=self.model.corpus_count, epochs=10)
-                if self.strategy_suppl == "faiss":
-                    self.strategy_model = FaissIndex(self.model)
-            else:
-                # Update model
-                self.model.build_vocab(walks, update=True)
-                self.model.train(walks, total_examples=len(walks), epochs=5) # An epoch is one complete pass through the entire training data.
-                if self.strategy_suppl == "faiss":
-                    if self.strategy_model == None:
+            # start random walk for new data
+            time_start = datetime.now()
+            print(f"[ExecTime] random walk starts ....................{time_start.strftime(TIME_FORMAT)}")
+            walks = dynrandom_walks_generation(self.config, self.graph)
+            time_end = datetime.now()
+            print(f"[ExecTime] random walk ends ....................{time_end.strftime(TIME_FORMAT)}")
+            print(f"[ExecTime] random walk time---------------------{time_end - time_start}")
+
+            if walks == []:
+                raise ValueError(f"Random walk anomaly")
+
+            try:
+                print("# Retraining embeddings model by window data...")
+                if len(self.model.wv.key_to_index) == 0:
+                    # initiate model
+                    time_start = datetime.now()
+                    print(f"[ExecTime] retraining embedding model starts ....................{time_start.strftime(TIME_FORMAT)}")
+                    self.model.build_vocab(walks)
+                    self.model.train(walks, total_examples=self.model.corpus_count, epochs=10)
+                    if self.strategy_suppl == "faiss":
                         self.strategy_model = FaissIndex(self.model)
-                    else:
-                        self.strategy_model.rebuild_index(self.model, self.graph.get_id_nums())
-                        # self.strategy_model.update_index(self.model)
-        except Exception as e:
-            print("[ERROR]: ", e)
-            self.app_logger.error(f"[ERROR]: {str(e)}")
-
-        self.build_matching_list(df)
+                    time_end = datetime.now()
+                    print(f"[ExecTime] retraining embedding model ends....................{time_end.strftime(TIME_FORMAT)}")
+                    print(f"[ExecTime] retraining embedding model time----------------------{time_end - time_start}")
+                else:
+                    # Update model
+                    time_start = datetime.now()
+                    print(f"[ExecTime] retraining embedding model starts ....................{time_start.strftime(TIME_FORMAT)}")
+                    self.model.build_vocab(walks, update=True)
+                    self.model.train(walks, total_examples=len(walks), epochs=5) # An epoch is one complete pass through the entire training data.
+                    if self.strategy_suppl == "faiss":
+                        if self.strategy_model == None:
+                            self.strategy_model = FaissIndex(self.model)
+                        else:
+                            self.strategy_model.rebuild_index(self.model, self.graph.get_id_nums())
+                            # self.strategy_model.update_index(self.model)
+                    time_end = datetime.now()
+                    print(f"[ExecTime] retraining embedding model ends....................{time_end.strftime(TIME_FORMAT)}")
+                    print(f"[ExecTime] retraining embedding model time----------------------{time_end - time_start}")
+            except Exception as e:
+                print("[ERROR]: ", e)
+                self.app_logger.error(f"[ERROR]: {str(e)}")
+        return df
 
     def _reset_timer(self):
         if self.timer:
@@ -154,32 +214,43 @@ class ConsumerService:
         self.timer.start()
 
     def _timerout_function(self):
-        print("last windows of this period")
-        self.debug_logger.info("### last windows of this period... ")
+        print("Last window of this experiment")
+        self.debug_logger.info("### last window of this experiment... ")
 
         if len(self.window_data) != 0:
             self.sim_list.check_output_path(self.output_file_name)
-            self.process_window_data()
+            df = self.process_window_data()
+            if not df.empty:
+                time_start = datetime.now()
+                # print(f"[ExecTime] sim structure building starts................{time_start.strftime(TIME_FORMAT)}")
+                self.build_matching_list(df, True)
+                time_end = datetime.now()
+                # print(f"[ExecTime] sim structure building ends.................{time_end.strftime(TIME_FORMAT)}")
+                # print(f"[ExecTime] sim structure building time---------------------{time_end - time_start}")
             self.window_data.clear()
             self.t_end_time = time.time()
-            print(f'[Finished] the test finished, num: {self.output_file_name}, execution time: {self.t_end_time - self.t_start_time}')
-            self.app_logger.info(f'[Finished] the test finished, num: {self.output_file_name}, execution time (s): {round(self.t_end_time - self.t_start_time - 60)}')
+            print(f'[Finished] the test finished, output file name: {self.output_file_name}, execution time(s): {self.t_end_time - self.t_start_time}')
+            self.app_logger.info(f'[Finished] the test finished, output file name: {self.output_file_name}, execution time (s): {round(self.t_end_time - self.t_start_time - self.timeout)}')
 
-            print(f"Saving model in binary format... Embedding file: pipeline/embeddings/{self.output_file_name}.emb")
-            self.model.save(f"pipeline/embeddings/{self.output_file_name}.emb") # Saves in binary format by default
+            print(f"Saving model in binary format... Embedding file: pipeline/embeddings/{self.output_file_name}.embin")
+            self.model.save(f"pipeline/embeddings/{self.output_file_name}.embin") # Saves in binary format by default
             # self.model.wv.save_word2vec_format(f"pipeline/embeddings/{self.output_file_name}.emb", binary=False) # Saves in binary format by default
             print("Model saved!")
 
-            if self.config["walks"]["rw_stat"] == True:
-                print(f"drawing... Distribution of random walk visit values: {self.output_file_name}")
-                random_walk_analysis(self.graph, self.output_file_name)
-                print("Graph Ok!")
+            self.sim_list.update_file()
+            print(f'output similarity relationship in file')
 
-            print(f"Saving graph with attributes... Graph file: /home/zhongwei/Data_ingestion/embIng/pipeline/graph")
+            if self.config["walks"]["rw_stat"] == True:
+                print(f"Drawing... Distribution of random walk visit values: {self.output_file_name}")
+                random_walk_analysis(self.graph, self.output_file_name)
+                print(f"Display statistical results in graphs. The folder for statiqtical results: pipeline/stat/")
+
+            print(f"Saving graph with attributes... Graph file path: pipeline/graph/graph-{self.output_file_name}.graphml")
             g = self.graph.clean_attributes()
             g.write_graphml(f"pipeline/graph/graph-{self.output_file_name}.graphml")
             print("Graph saved!")
-            print("Process over!!!!!!!!!!!!!!!!")
+            print("Process over!!!!!!!!!!!!!!!! The program will be closed automatically in few secondes")
+            # print("Press 'ctrl+C' to stop listening of kafka consumer")
 
             
 
@@ -202,7 +273,8 @@ class ConsumerService:
                 bootstrap_servers=f'{self.config["kafka"]["bootstrap_servers"]}:{self.config["kafka"]["port"]}',
                 value_deserializer=lambda x: json.loads(x.decode('utf-8')),
                 group_id=self.config['kafka']["groupid"],
-                enable_auto_commit=True
+                enable_auto_commit=True,
+                auto_offset_reset='latest'
             )
         except Exception as e:
             self.app_logger.error(f"Fatal error in consumer service: {str(e)}")
@@ -211,8 +283,20 @@ class ConsumerService:
 
         self.app_logger.info("Start Kafka consumer...")
 
+        empty_poll_count = 0
+        max_empty_polls = 500  # 相当于约 50 秒内没消息就退出（poll 每次 100ms）
+        poll_timeout = 100  # ms
+
         while True:
-            msg_pack = self.consumer.poll(timeout_ms=100)  # Non-blocking batch pull
+            msg_pack = self.consumer.poll(timeout_ms=poll_timeout)  # Non-blocking batch pull
+
+            if not msg_pack:
+                empty_poll_count += 1
+                if empty_poll_count >= max_empty_polls:
+                    print("[INFO] No new messages for a while. Exiting consumer loop.")
+                    break
+            else:
+                empty_poll_count = 0  # reset counter
 
             for tp, messages in msg_pack.items():
                 for msg in messages:
@@ -254,10 +338,13 @@ class ConsumerService:
                         self.app_logger.error(f"Error processing message: {str(e)}")
                         traceback.print_exc()
                     
-                    self._reset_timer()
+                    # self._reset_timer()
 
             # prevent tight loop
             time.sleep(0.01)  
+        self._timerout_function()  # 处理最后窗口
+        self.consumer.close()
+        print("[INFO] Consumer shutdown complete.")
 
     def _handle_time_window(self, metadata, current_time):
         metadata["timestamp"] = current_time
@@ -293,32 +380,148 @@ class ConsumerService:
         update metric for window data processing time 
         '''        
         start = time.time()
-        self.process_window_data()
+        df = self.process_window_data()
+        if not df.empty:
+            self.build_matching_list(df, False)
         end = time.time()
         self.metrics.update_window_data_processing_time((end - start) / len(self.window_data))
+
+    def _extract_candidates_from_graph(self, graph) -> dict:
+        """
+        从图中提取所有 type='idx' 的节点，并获取其邻居的 name 字段
+        """
+        candidats = {}
+        for v in graph.vs:
+            if v.attributes().get("type") == "idx" and "name" in v.attributes():
+                rid = v["name"]
+                candidats[rid] = self.graph.get_record(v)
+        return candidats
+
+    def _em_inc(self, df):
+        print('preprocessing')
+        graph = self.graph.get_graph()
+        # rids = [v.index for v in graph.vs if v["type"] == "idx"]
+        canididats = self._extract_candidates_from_graph(graph)
+        # for rid_index in rids:
+        #     canididats[graph.vs[rid_index]["name"]] = self.graph.get_record(rid_index)
+        df, existing_nodes, new_nodes, new_nodes_index = preprocessing_incremental(df, canididats)
+        if new_nodes:
+            print("testing")
+
+            for pair in new_nodes:
+                for record_i in pair:
+                    # if self.sim_list.output_format == "db":
+                    #     self.sim_list.insert_data(record_i)
+                    # print(self.sim_list.get_similarity_words_with_score(target, self.config["simlist_show"]))
+                    for record_j in pair:
+                        if record_i != record_j:
+                            self.sim_list.add_similarity(record_j, [(record_i, int(1))])
+                            if self.config["similarity_list"]["sim_structure"] != "graph":
+                                self.sim_list.add_similarity(record_i, [(record_j, int(1))])
+                                
+        if existing_nodes:
+            print("testing")               
+            for id_in_graph in existing_nodes:
+                em_ids = existing_nodes[id_in_graph]
+                if type(em_ids) == str:
+                    em_ids = [em_ids]
+
+                if self.config["similarity_list"]["sim_structure"] == "graph":
+                    sim = []
+                    for em_id in em_ids:
+                        sim.append((em_id, int(1)))
+                    self.sim_list.add_similarity(id_in_graph, sim)
+
+                else:
+                    ### find old exact matches 
+                    existing_matchs = []
+                    heap_list = self.sim_list.get_similarity_words_with_score(id_in_graph, 10)
+                    if heap_list:
+                        for score, word in heap_list:
+                            if int(score) == 1:
+                                existing_matchs.append(word)
+                    ### add new exact matches for target (1) and add existing matchs for new matchs (2)
+                    for em_id in em_ids:
+                        ## (1)
+                        self.sim_list.add_similarity(id_in_graph, [(em_id, int(1))])
+                        ## (2)
+                        self.sim_list.add_similarity(em_id, [(id_in_graph, int(1))])
+                        if existing_matchs:
+                            for exm in existing_matchs:
+                                self.sim_list.add_similarity(em_id, [(exm, int(1))])
+                    #     if self.sim_list.output_format == "db":
+                    #         self.sim_list.insert_data(em_id)
+                    # if self.sim_list.output_format == "db":
+                    #     self.sim_list.insert_data(id_in_graph)
+                    
+                    ### add new matchs for existing matchs
+                    if existing_matchs:
+                        for match in existing_matchs:
+                            for em_id in em_ids:
+                                self.sim_list.add_similarity(id_in_graph, [(em_id, int(1))])
+                            # if self.sim_list.output_format == "db":
+                            #     self.sim_list.insert_data(match)
+                
+
+        
+            # for r in new_nodes_index:
+            #     if self.sim_list.output_format == "db":
+            #         self.sim_list.insert_data(record_i)
+            #         self.sim_list.insert_data(record_j)
+        return df
             
 
-def _start_prometheus_port():
-    print("start thread prometheus..")
-    start_http_server(8000)
-                                
+def _start_prometheus_port(port=8000):
+    def is_port_free(port):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                s.bind(("0.0.0.0", port))
+                return True
+            except OSError:
+                return False
+
+    if is_port_free(port):
+        print(f"[INFO] Prometheus starting on port {port}...")
+        start_http_server(port)
+    else:
+        print(f"[WARN] Port {port} is already in use. Prometheus server not started.")
+
+def handle_sigint(signum, frame):
+    global consumer
+    print("Received SIGINT (Ctrl+C), shutting down...")
+    if consumer:
+        consumer.consumer.close()
+        consumer = None
+        print(f"-----------------Closing Kafka Consumer-------------------")
+    print(f"-----------------Exiting program-------------------")
+    sys.exit(0)
+
 def start_kafka_consumer(configuration, graph, model, output_file_name):
     metrics = Metrics()
-    t = threading.Thread(target=_start_prometheus_port, daemon=True)
-    t.start()
+    # t = threading.Thread(target=_start_prometheus_port, daemon=True)
+    # t.start()
 
     consumer = ConsumerService(configuration, graph, model, output_file_name, metrics)
     # check output path
     consumer.sim_list.check_output_path(output_file_name)
-    if consumer.sim_list.output_format != "db":
-        consumer.flag_running = True
-        consumer.trigger_file_write()
+    # if consumer.sim_list.output_format != "db":
+    # consumer.flag_running = True
+    # consumer.trigger_file_write()
     
-    try:
-        consumer.run()
-    except KeyboardInterrupt:
-            consumer.consumer.close()
-            print(f"-----------------Exiting program-------------------")
+
+    signal.signal(signal.SIGINT, handle_sigint)
+    consumer.run()
+    
+    # try:
+    #     consumer.run()
+    # except KeyboardInterrupt:
+    #         if consumer:
+    #             consumer.consumer.close()
+    #             consumer = None
+    #             print(f"-----------------Closing Kafka Consumer-------------------")
+    #         print(f"-----------------Exiting program-------------------")
+    #         sys.exit(0)
 
 if __name__ == '__main__':
     # consumer_service(configuration, graph, wv)

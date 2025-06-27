@@ -11,6 +11,7 @@ import pandas as pd
 from sklearn.decomposition import PCA
 from copy import deepcopy
 from ruamel.yaml import YAML
+from datetime import datetime
 
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 OUTPUT_FORMAT = "# {:.<60} {}"
@@ -57,7 +58,7 @@ def _verify_sk(config):
         if "window_time" not in config["kafka"]:
             raise ValueError("Expected window_time value.")
     
-    if config["similarity_list"]["output_format"] not in ["db", "json", "parquet"]:
+    if config["similarity_list"]["output_format"] not in ["db", "json", "parquet", "graphml"]:
         raise ValueError("output_format must be one of ['db', 'json', 'parquet']")
     if config["similarity_list"]["strategy_suppl"] not in ["faiss", "basic"]:
         raise ValueError('''strategy_suppl must be one of ["faiss", "basic"]''')
@@ -153,9 +154,36 @@ def convert_token_value(original_value):
         return [clean_str(str(original_value))], False
     
 def clean_str(value):
+    value = value.lower().strip()
     translation_table = str.maketrans({
         '"': r'\"',
-        ',': '',
+        ',': '_',
         ' ': '_'
     })
     return value.translate(translation_table)
+
+def clean_date(value):
+    date_formats = [
+            ("%Y-%m-%d", "%Y%m%d"),
+            ("%Y/%m/%d", "%Y%m%d"),
+            ("%d-%m-%Y", "%Y%m%d"),
+            ("%d/%m/%Y", "%Y%m%d"),
+            ("%Y-%m", "%Y%m"),
+            ("%Y/%m", "%Y%m"),
+        ]
+
+    for fmt_in, fmt_out in date_formats:
+        try:
+            dt = datetime.strptime(value, fmt_in)
+            return str(dt.strftime(fmt_out))
+        except ValueError:
+            continue
+    return value
+
+def data_cleaning(input):
+    if isinstance(input, str):
+        value = clean_str(input)
+        res = clean_date(value)
+        return res
+    else:
+        return str(input)

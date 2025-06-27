@@ -1,7 +1,9 @@
+from itertools import combinations
 import json
 import logging
 import os
 from pathlib import Path
+from igraph import Graph
 import sqlite3
 import math
 import pandas as pd
@@ -67,10 +69,48 @@ def _get_similarity_list(similarity_file, output_format):
                 raise ValueError("[ERROR] Do not find similarity file.")
         except Exception as e:
             logging.error(f"Error processing message: {str(e)}")
+    elif output_format == "graphml":
+        try:
+            if Path(similarity_file).exists():
+                g = Graph.Read_GraphML(similarity_file)
+
+                for v in g.vs:
+                    node_name = v["name"]
+                    members = v["members"].split(",") if "members" in v.attributes() else [node_name]
+
+                    neighbors = g.neighbors(v.index, mode="OUT")
+                    similarity_list = []
+                    for n_idx in neighbors:
+                        neighbor_name = g.vs[n_idx]["name"]
+                        edge_id = g.get_eid(v.index, n_idx, directed=False, error=False)
+                        if edge_id != -1:
+                            sim = g.es[edge_id]["weight"]
+                            similarity_list.append((sim, neighbor_name))
+
+                    # Create the same similarity list for all members of the node
+                    if similarity_list != []:
+                        for member in members:
+                            
+                            sim_list[member] = similarity_list
+                            # print(f"member: {member}, simialrity_list: {similarity_list}")
+                    
+                # Step 2: Add all pairwise combinations with internal similarity of 1.0 for the merged nodes
+                for v in g.vs:
+                    members = v["members"].split(",") if "members" in v.attributes() else []
+                    if len(members) >= 2:
+                        for a, b in combinations(members, 2):
+                            # Bidirectionally join sim_list
+                            sim_list.setdefault(a, []).append((1.0, b))
+                            # print(f"member: {a}, simialrity_list: (1, {b})")
+
+            else:
+                raise ValueError("[ERROR] Do not find similarity file.")
+        except Exception as e:
+            logging.error(f"Error processing graphml: {str(e)}")
     return sim_list
 
 
-def _get_match_pairs(data_dict):
+def _get_match_pairs(data_dict, source_a):
     '''
     :param item: {'key': ['match1', 'match2'], 'key2': ['match1', 'match2']}
     :return: ex. (item, match1), (item, match2)
@@ -90,10 +130,14 @@ def _get_match_pairs(data_dict):
                 el = (item_matched, item_matching)
             else:
                 el = (item_matching, item_matched)
-            matchpair_set.add(el)
+            
+            # because of dataset constraint, limit the comparison between A and B
+            for id in el:
+                if id < source_a:
+                    matchpair_set.add(el)
     return matchpair_set
 
-def _get_similar_pairs(data_dict, n, appr):
+def _get_similar_pairs(data_dict, n, appr, seuil):
     '''
     :param data_dict: {'key': [(sim_degree, 'match1'), (sim_degree, 'match2')], 'key2': [(sim_degree, 'match1'), (sim_degree, 'match2')]}
     :param n: select top n similarities
@@ -101,7 +145,9 @@ def _get_similar_pairs(data_dict, n, appr):
     :return: ex. (item, match1), (item, match2)
     '''
     matchpair_set = set()
+    s = ""
     for key in data_dict:
+        # print(key)
         item_matched = int(key.split('__')[1])
         values = [[round(degree, appr), _] for degree, _ in data_dict[key]]
         if isinstance(n, int) and n>0:
@@ -116,13 +162,17 @@ def _get_similar_pairs(data_dict, n, appr):
                 item_matching = item[1]
                 item_matching = int(item_matching.split('__')[1])
 
-            # sort: facilitate deplication
-            if item_matching > item_matched:
-                el = (item_matched, item_matching)
-            else:
-                el = (item_matching, item_matched)
-            matchpair_set.add(el)
-    return matchpair_set
+            if item[0] >= seuil and item_matched != item_matching:
+                # sort: facilitate deplication
+                if item_matching > item_matched:
+                    el = (item_matched, item_matching)
+                else:
+                    el = (item_matching, item_matched)
+                matchpair_set.add(el)
+                res = f"pair: {el}, score: {item[0]} \n"
+                # print(f"pair: {el}, score: {item[0]}")
+                s = s + res
+    return matchpair_set, s
 
 def _get_similarity_pairs_with_degree(data_dict, n, appr):
     sim_list = {}
@@ -146,37 +196,64 @@ def compare_ground_truth(configuration):
     ground_truth_file = configuration['match_file']
     similarity_file = configuration['similarity_file']
     output_format = configuration['output_format']
+    k = configuration['eva']['n_first']
+    appr = configuration['eva']['approximate']
+    source_a = configuration['source_a']
     # similarity_list example: {item: [matches]}
     similarity_list = _get_similarity_list(similarity_file, output_format)
     
     # matches example: {item: [matches]}
     matches = _get_ground_truth(ground_truth_file)
-
-    correct_matches = 0
-    predicted_matches = _get_similar_pairs(similarity_list, int(configuration['eva']['n_first']), int(configuration['eva']['n_first']))
-    actual_matches = _get_match_pairs(matches)
-
-    total_predicted_matches = len(predicted_matches)
+    actual_matches = _get_match_pairs(matches, source_a)
     total_relevant_matches = len(actual_matches)
-    correct_matches =  len(set(predicted_matches) & set(actual_matches)) 
+    f_total_relevant_matches = total_relevant_matches
+    print(f'ground truth: {total_relevant_matches}')
 
-    if configuration['eva']['n_first'] == True:
-        sim_list = _get_similarity_pairs_with_degree(similarity_list, int(configuration['eva']['n_first']), int(configuration['eva']['n_first']))
-        similarity_analysis(sim_list, actual_matches, configuration['output_file_name'], int(configuration['eva']['n_first']))
-    # Precision: Number of correct matches / Total predicted matches
-    precision = correct_matches / total_predicted_matches if total_predicted_matches != 0 else 0.0
-    # Recall: Number of correct matches / Total relevant matches
-    recall = correct_matches / total_relevant_matches if total_relevant_matches != 0 else 0.0
-    f1_score = 2*precision*recall / (precision + recall) if (precision + recall) != 0 else 0.0
+    f_seuil = 0
+    f_total_predicted_matches = 0
+    f_correct_matches = 0
+
+    f_precision = 0
+    f_recall = 0
+    f_f1_score = 0
+    f_k = 0
+    for seuil in [i / 100 for i in range(5, 100, 5)]:
+        for k in range (1, 11):
+            correct_matches = 0
+            predicted_matches, s = _get_similar_pairs(similarity_list, k, appr, seuil)
+            
+            total_predicted_matches = len(predicted_matches)
+            
+            correct_matches =  len(set(predicted_matches) & set(actual_matches)) 
+
+            # Precision: Number of correct matches / Total predicted matches
+            precision = correct_matches / total_predicted_matches if total_predicted_matches != 0 else 0.0
+            # Recall: Number of correct matches / Total relevant matches
+            recall = correct_matches / total_relevant_matches if total_relevant_matches != 0 else 0.0
+            f1_score = 2*precision*recall / (precision + recall) if (precision + recall) != 0 else 0.0
+
+            if recall > f_recall:
+            # if f1_score > f_f1_score:
+                f_seuil = seuil
+                f_total_predicted_matches = total_predicted_matches
+                f_correct_matches = correct_matches
+                f_precision = precision
+                f_recall = recall
+                f_f1_score = f1_score
+                f_k = k
+
+    sim_list = _get_similarity_pairs_with_degree(similarity_list, k, appr)
+    similarity_analysis(sim_list, actual_matches, configuration['output_file_name'], k)
+    
 
     # print results
-    print(f'''Evaluation result for {similarity_file}: \n correct matches: {correct_matches} \n total number of predicted matches: {total_predicted_matches} \n total number of matches in groud truth file: {total_relevant_matches} \n \n precision: {precision} \n recall: {recall} \n f1 score: {f1_score}''')
+    print(f'''Evaluation result for {similarity_file}: \n seuil: {f_seuil} \n k: {f_k} \n correct matches: {f_correct_matches} \n total number of predicted matches: {f_total_predicted_matches} \n total number of matches in groud truth file: {f_total_relevant_matches} \n \n precision: {f_precision} \n recall: {f_recall} \n f1 score: {f_f1_score}''')
 
     # output results to log file
     dir_name = "evaluation"
     Path(f'''{configuration['log']['path']}/{dir_name}''').mkdir(parents=True, exist_ok=True)
     logger = write_log(f'''{configuration['log']['path']}''', dir_name, dir_name)
     
-    logger.info(f'''[RESULTS] Evaluation result of similarity list in file [{similarity_file}] by taking records with top {configuration["eva"]["n_first"]} similarity and the similarity retains {configuration['eva']['n_first']} decimal places: \n correct matches: {correct_matches} \n total number of predicted matches: {total_predicted_matches} \n total number of matches in groud truth file: {total_relevant_matches} \n \n precision: {precision} \n recall: {recall} \n f1 score: {f1_score}''')
-    
+    logger.info(f'''[RESULTS] Evaluation result of similarity list in file [{similarity_file}] :\n seuil: {f_seuil} \n top k records: {f_k} \n decimal places retaining for the similarity: {appr} : \n correct matches: {f_correct_matches} \n total number of predicted matches: {f_total_predicted_matches} \n total number of matches in groud truth file: {f_total_relevant_matches} \n \n precision: {f_precision} \n recall: {f_recall} \n f1 score: {f_f1_score}''')
+    logger.info(s)
     # return precision, recall, f1_score

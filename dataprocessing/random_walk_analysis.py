@@ -30,7 +30,7 @@ def _distribution_analysis(prop, valus_list, graph_path, output_file_name):
     plt.savefig(f"{graph_path}/distribution {prop}-{output_file_name}.png", dpi=300)
 
 def random_walk_analysis(graph, output_file_name):
-    exp_logger = write_log("pipeline/logging", "experiments", "ex_random_walk")
+    exp_logger = write_log("pipeline/logging", "walks", "stat_random_walk")
     graph = graph.get_graph()
     # visualization
     vis_token = {}

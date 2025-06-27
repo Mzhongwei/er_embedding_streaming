@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 import math
 import traceback
 
@@ -117,26 +117,26 @@ class DynGraphIgraph:
             node = self._add_vertex(node_name, node_prefix)
         else:
 
-        # ## method1: if the node.name exists, skip 
-        #     try:
-        #         node = self.graph.vs.find(name=node_name)
-        #     except ValueError:
-        #         ## if the node.name doesn't exist, create new vertex
-        #         node = self._add_vertex(node_name, node_prefix)           
-        # ## END method1
+        ## method1: if the node.name exists, skip 
+            try:
+                node = self.graph.vs.find(name=node_name)
+            except ValueError:
+                ## if the node.name doesn't exist, create new vertex
+                node = self._add_vertex(node_name, node_prefix)           
+        ## END method1
 
-        ## method2: add new node anyway
-            if node_prefix == "cid" or node_prefix == "idx":
-                try:
-                    node = self.graph.vs.find(name=node_name)
-                    node["frequency_in_graph"] = node["frequency_in_graph"] + 1
-                    return node.index
-                except ValueError:
-                    ## if the cid node.name doesn't exist, create new vertex
-                    node = self._add_vertex(node_name, node_prefix)
-            else:
-                node = self._add_vertex(node_name, node_prefix)
-        ## END method2
+        # ## method2: add new node anyway
+        #     if node_prefix == "cid" or node_prefix == "idx":
+        #         try:
+        #             node = self.graph.vs.find(name=node_name)
+        #             node["frequency_in_graph"] = node["frequency_in_graph"] + 1
+        #             return node.index
+        #         except ValueError:
+        #             ## if the cid node.name doesn't exist, create new vertex
+        #             node = self._add_vertex(node_name, node_prefix)
+        #     else:
+        #         node = self._add_vertex(node_name, node_prefix)
+        # ## END method2
 
         node["frequency_in_graph"] = node["frequency_in_graph"] + 1
         return node.index
@@ -153,12 +153,6 @@ class DynGraphIgraph:
                 node = self._add_vertex(ins_value, prefix)
         node["frequency_in_graph"] = node["frequency_in_graph"] + 1
         return node.index           
-
-    def _tokenization(self, value):
-        '''tokenization by '_' for now 
-        if you change the tokenization rules, ajust function "def clean_str(value: str)" in flie ytils.py
-        '''
-        return value.split('_')
 
     def _add_vertex(self, node_name, node_prefix):
         
@@ -256,11 +250,14 @@ class DynGraphIgraph:
         # update vertex
         # if tokenization
         if prefix in self.to_flatten:
-            valsplit = self._tokenization(ins_value)
+            '''tokenization by '_' for now 
+            if you change the tokenization rules, ajust function "def clean_str(value: str)" in flie ytils.py
+            '''
+            valsplit = ins_value.split('_')
             for val in valsplit:
                 if val.strip() == "":
                     continue
-                val_index = self._update_token(val, prefix)
+                val_index = self._update_token(val, "st")
                 instances_index.add(val_index)
 
         for index in instances_index:
@@ -330,7 +327,7 @@ class DynGraphIgraph:
             return []
         idx = self.graph.vs.find(name=node_name)
         neighbors = self.graph.neighbors(idx, mode='ALL')
-        return [self.graph.vs[n]['name'] for n in neighbors]
+        return [self.graph.vs[n]['name'] for n in neighbors]      
     
     def show_summary(self):
         print(self.graph.summary())
@@ -341,6 +338,15 @@ class DynGraphIgraph:
     def set_node_attribute(self, node_name, attr, value):
         self.graph.vs.find(name=node_name)[attr] = value
 
+    def get_record(self, id_index):
+        """Function used to get instances of one id
+
+        :param id_index: id_num (int)
+        :return  list: all instences in one record
+        """
+        neighbors = self.graph.neighbors(id_index, mode='OUT')
+        return [self.graph.vs[n]['name'] for n in neighbors if self.graph.vs[n]['type'] != "st"]
+
 def dyn_graph_generation(configuration):
     """
     Generate the graph for the given dataframe following the specifications in configuration.
@@ -348,8 +354,8 @@ def dyn_graph_generation(configuration):
     :param configuration: dictionary with all the run parameters
     :return: the generated graph
     """
-    if 'flatten' in configuration and configuration['graph']['flatten']:
-        if configuration['graph']['flatten'].lower() not in ['all', 'false']:
+    if configuration['graph']['flatten']:
+        if configuration['graph']['flatten'].lower() not in ['all', 'false', 'no']:
             flatten = configuration['graph']['flatten'].strip().split(',')
         elif configuration['graph']['flatten'].lower() == 'false':
             flatten = []
@@ -358,14 +364,15 @@ def dyn_graph_generation(configuration):
     else:
         flatten = []
 
-    t_start = datetime.datetime.now()
+    print(f"faltten: {configuration['graph']['flatten']}")
+    t_start = datetime.now()
     print(OUTPUT_FORMAT.format('Starting graph construction', t_start.strftime(TIME_FORMAT)))
 
     node_types = configuration['graph']['node_types']
     directed = configuration['graph']['directed']
     smooth = configuration['graph']['smoothing_method']
     g = DynGraphIgraph(node_types=node_types, flatten=flatten, directed=directed, smooth=smooth)
-    t_end = datetime.datetime.now()
+    t_end = datetime.now()
     dt = t_end - t_start
     print()
     print(OUTPUT_FORMAT.format('Graph construction complete', t_end.strftime(TIME_FORMAT)))

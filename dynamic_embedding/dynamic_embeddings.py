@@ -9,6 +9,7 @@ def initialize_embeddings(
     write_walks,
     dimensions,
     window_size,
+    min_count,
     training_algorithm="word2vec",
     learning_method="skipgram",
     workers=mp.cpu_count(),
@@ -38,7 +39,7 @@ def initialize_embeddings(
             model = Word2Vec(
                 vector_size=dimensions,
                 window=window_size,
-                min_count=2,
+                min_count=min_count,
                 sg=sg,
                 workers=workers,
                 sample=sampling_factor,
@@ -48,7 +49,7 @@ def initialize_embeddings(
             model = Word2Vec(
                 vector_size=dimensions,
                 window=window_size,
-                min_count=2,
+                min_count=min_count,
                 sg=sg,
                 workers=workers,
                 sample=sampling_factor,
@@ -65,7 +66,7 @@ def initialize_embeddings(
             model = Doc2Vec(
                 size=dimensions,
                 window=window_size,
-                min_count=2,
+                min_count=min_count,
                 sg=sg,
                 workers=workers,
                 sample=sampling_factor,
@@ -75,7 +76,7 @@ def initialize_embeddings(
             model = Doc2Vec(
                 size=dimensions,
                 window=window_size,
-                min_count=2,
+                min_count=min_count,
                 sg=sg,
                 workers=workers,
                 sample=sampling_factor,
@@ -86,7 +87,7 @@ def initialize_embeddings(
         if write_walks:
             model = FastText(
                 window=window_size,
-                min_count=2,
+                min_count=min_count,
                 workers=workers,
                 vector_size=dimensions,
             )
@@ -95,7 +96,7 @@ def initialize_embeddings(
             model = FastText(
                 vector_size=dimensions,
                 workers=workers,
-                min_count=2,
+                min_count=min_count,
                 window=window_size,
             )
             return model

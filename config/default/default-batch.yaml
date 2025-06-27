@@ -8,6 +8,7 @@ graph:
   node_types:
     - "7#__tn"
     - "7$__tt"
+    - "7$__st"
     - "3$__idx"
     - "1$__cid"
   flatten: "no"                  # split prefix for nodes
@@ -24,6 +25,7 @@ walks:
 embeddings:
   learning_method: "skipgram"    # skipgram / CBOW
   window_size: 3
+  min_count: 0
   n_dimensions: 300
   training_algorithm: "word2vec" # word2vec / fasttext
   sampling_factor: 0.001

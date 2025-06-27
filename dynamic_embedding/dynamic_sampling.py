@@ -20,6 +20,7 @@ class RandomWalk:
         # find node and its neighbors
         starting_node = i_graph.vs[starting_node_index]
         starting_node_name = starting_node['name']
+        app_debug.info(f"root name: {starting_node_name}")
         # first step 
         if starting_node['node_class']['isfirst']:
             self.walk = [starting_node_name]

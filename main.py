@@ -1,6 +1,6 @@
 import argparse
 import ast
-import datetime
+from datetime import datetime
 import json
 from pathlib import Path
 from ruamel.yaml import YAML
@@ -8,6 +8,8 @@ from ruamel.yaml import YAML
 import warnings
 
 from gensim.models import FastText, Word2Vec
+
+from comparison_approaches.exact_matching import preprocessing_batch
 
 
 
@@ -45,6 +47,24 @@ def batch_driver(configuration):
     id_nums = len(df_table)
     df_table["rid"] = ["idx__{}".format(i) for i in range(id_nums)] 
 
+    #### preprocessing 
+    # list_to_compare, pairs, pairs_index = preprocessing_batch(df_table)
+    # if pairs:
+    #     print("testing")
+
+    #     for pair in pairs:
+    #         for record_i in pair:
+    #             self.sim_list.insert_data(record_i)
+    #             # print(self.sim_list.get_similarity_words_with_score(target, self.config["simlist_show"]))
+    #             for record_j in pair:
+    #                 if record_i != record_j:
+    #                     self.sim_list.add_similarity(record_j, [(record_i, int(1))])
+    #                     self.sim_list.add_similarity(record_i, [(record_j, int(1))])
+    #     for r in pairs_index:
+    #         if self.sim_list.output_format == "db":
+    #             self.sim_list.insert_data(record_i)
+    #             self.sim_list.insert_data(record_j)
+
     # generate graph and save
     graph = dyn_graph_generation(configuration)
     graph.set_id_nums(int(id_nums-1))
@@ -57,11 +77,12 @@ def batch_driver(configuration):
     walks = dynrandom_walks_generation(configuration, graph)
     
     # training model
-    embeddings_file = f"pipeline/embeddings/{configuration['output_file_name']}.emb"
+    embeddings_file = f"pipeline/embeddings/{configuration['output_file_name']}.embin"
     print("create a new model...")
     model = initialize_embeddings(write_walks=configuration['walks']['write_walks'],
                 dimensions=configuration['embeddings']['n_dimensions'],
                 window_size=configuration['embeddings']['window_size'],
+                min_count=configuration['embeddings']['min_count'],
                 training_algorithm=configuration['embeddings']['training_algorithm'],
                 learning_method=configuration['embeddings']['learning_method'],
                 sampling_factor=configuration['embeddings']['sampling_factor'])
@@ -69,11 +90,13 @@ def batch_driver(configuration):
     model.build_vocab(walks)
     model.train(walks, total_examples=model.corpus_count, epochs=10)
     model.save(embeddings_file)
+    print(f"-- Embeddings model saved, the file path: {embeddings_file}")
+
     
-    print(f"Saving graph with attributes... Graph file path: /home/zhongwei/Data_ingestion/embIng/pipeline/graph")
+    print(f"Saving graph with attributes...")
     g = graph.clean_attributes()
     g.write_graphml(f"pipeline/graph/{configuration['output_file_name']}.graphml")
-    print("Graph saved!")
+    print(f"-- Graph saved, the file path: pipeline/graph/{configuration['output_file_name']}.graphml")
 
 def streaming_driver(configuration):
     '''This function initiates Graph and Embedding model for the streaming process. 
@@ -105,7 +128,7 @@ def streaming_driver(configuration):
         configuration["source_num"] = graph.get_id_nums()
         ##### load model
         embeddings_file = configuration['embeddings_file']
-        if configuration['embeddings']['window_size'] == 'fasttext':
+        if configuration['embeddings']['training_algorithm'] == 'fasttext':
             print('load fasttext model...')
             model = FastText.load(embeddings_file)
         else:
@@ -118,6 +141,7 @@ def streaming_driver(configuration):
         model = initialize_embeddings(write_walks=configuration['walks']['write_walks'],
                     dimensions=configuration['embeddings']['n_dimensions'],
                     window_size=configuration['embeddings']['window_size'],
+                    min_count=configuration['embeddings']['min_count'],
                     training_algorithm=configuration['embeddings']['training_algorithm'],
                     learning_method=configuration['embeddings']['learning_method'],
                     sampling_factor=configuration['embeddings']['sampling_factor'])
@@ -220,13 +244,13 @@ def main(file_path=None, dir_path=None, args=None):
                 print('#' * 80)
                 print(f'# File {idx + 1} out of {valid_files}')
                 print(f'# Configuration file: {file}')
-                t_start = datetime.datetime.now()
+                t_start = datetime.now()
                 print(OUTPUT_FORMAT.format('Starting run.', t_start.strftime(TIME_FORMAT)))
                 print()
 
                 full_run(config_dir, file)
 
-                t_end = datetime.datetime.now()
+                t_end = datetime.now()
                 print(OUTPUT_FORMAT.format('Ending run.', t_end.strftime(TIME_FORMAT)))
                 dt = t_end - t_start
                 print('# Time required: {:.2} s'.format(dt.total_seconds()))
@@ -238,13 +262,13 @@ def main(file_path=None, dir_path=None, args=None):
             print('#' * 80)
             print(f'# File {idx + 1} out of {valid_files}')
             print(f'# Configuration file: {file}')
-            t_start = datetime.datetime.now()
+            t_start = datetime.now()
             print(OUTPUT_FORMAT.format('Starting run.', t_start.strftime(TIME_FORMAT)))
             print()
 
             full_run(config_dir, file)
 
-            t_end = datetime.datetime.now()
+            t_end = datetime.now()
             print(OUTPUT_FORMAT.format('Ending run.', t_end.strftime(TIME_FORMAT)))
             dt = t_end - t_start
             print('# Time required: {:.2f} s'.format(dt.total_seconds()))

@@ -78,6 +78,33 @@ class SimilarityList:
                 print(f"[ERROR] Insert data failed: {e}")
                 self.app_logger.error(f"[ERROR] Insert data failed: {e}")
 
+    def update_db(self):
+        """
+        update all records in a database 
+        """
+        # print('insert data.. ')
+        if self.output_format=="db":
+            try:
+                if self.db_cursor is None:
+                    self.check_output_path(self.name)
+
+                for key in self. similarity_dict:
+                    value = self.similarity_dict.get(key)
+                    if value is not None and value != []:
+                        self.db_cursor.execute(f"""
+                            INSERT INTO matchinglist (id, similarity) VALUES (?, ?)
+                            ON CONFLICT(id) DO UPDATE SET similarity = excluded.similarity;
+                            """, (key, json.dumps(value)))
+                    # print(f"""
+                    #     INSERT INTO matchinglist (id, similarity) VALUES ({key}, {json.dumps(value)})
+                    #     ON CONFLICT(id) DO UPDATE SET similarity = excluded.similarity;
+                    #     """)
+                    # print("[Great] data inserted!")
+                    # self.app_logger.info("[Great] data inserted!")
+                        self.db_conn.commit()
+            except Exception as e:
+                print(f"[ERROR] Insert data failed: {e}")
+                self.app_logger.error(f"[ERROR] Insert data failed: {e}")
 
     def update_file(self):
         """
@@ -93,15 +120,20 @@ class SimilarityList:
                 # Save as Parquet
                 df["value"].apply(json.dumps)
                 df.to_parquet(self.file_path, engine="pyarrow", index=False)
-            if self.output_format=="json":
+            elif self.output_format=="json":
                 with open(self.file_path, "w") as f:
                     json.dump(self.similarity_dict, f)
+            elif self.output_format == "db":
+                self.update_db()
         except Exception:
             print("[ERROR]: can not update file ", Exception)
             self.app_logger.error("[ERROR]: can not update file ", Exception)
 
 
     def add_similarity(self, target, new_similarities):
+        '''
+        : param new_similarities: [(word, score)]
+        '''
         # add to word and score to dictionary
         # If the target word already exists, take out the current similarity list, otherwise create an empty list
         
