@@ -3,8 +3,11 @@ import ast
 from datetime import datetime
 import json
 from pathlib import Path
+import time
 from ruamel.yaml import YAML
-
+from codecarbon import track_emissions
+from pyJoules.energy_meter import measure_energy
+from pyJoules.handler.csv_handler import CSVHandler
 import warnings
 
 from gensim.models import FastText, Word2Vec
@@ -23,6 +26,8 @@ with warnings.catch_warnings():
     from dynamic_embedding.dynamic_sampling import dynrandom_walks_generation
     from dataprocessing.kafkaconsumer import start_kafka_consumer
 
+csv_handler = CSVHandler('/home/zhongwei/Data_integration/er_embedding_streaming/result.csv')   
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--unblocking', action='store_true', default=False)
@@ -34,6 +39,7 @@ def parse_args():
     return args
 
 def batch_driver(configuration):
+    start = time.time()
     config_logger = write_log(configuration['log']['path'], "config", "batch")
     print(f"Saving configuration setting in log file...")
     config_logger.info(f"Configuration for batch test: {json.dumps(configuration)}")
@@ -75,7 +81,6 @@ def batch_driver(configuration):
 
     # random walk
     walks = dynrandom_walks_generation(configuration, graph)
-    
     # training model
     embeddings_file = f"pipeline/embeddings/{configuration['output_file_name']}.embin"
     print("create a new model...")
@@ -96,7 +101,10 @@ def batch_driver(configuration):
     print(f"Saving graph with attributes...")
     g = graph.clean_attributes()
     g.write_graphml(f"pipeline/graph/{configuration['output_file_name']}.graphml")
+    end = time.time()
     print(f"-- Graph saved, the file path: pipeline/graph/{configuration['output_file_name']}.graphml")
+    print(f'[Finished] the test finished, pre-training execution time(s): {end - start}')
+            
 
 def streaming_driver(configuration):
     '''This function initiates Graph and Embedding model for the streaming process. 
@@ -193,9 +201,9 @@ def full_run(config_dir, config_file):
         evaluation_driver(configuration)
     elif configuration['task'] == "batch":
         batch_driver(configuration)
-        
 
-
+@track_emissions(offline=True, country_iso_code="FRA")
+@measure_energy(handler=csv_handler)
 def main(file_path=None, dir_path=None, args=None):
     results = None
     configuration = None
@@ -215,11 +223,9 @@ def main(file_path=None, dir_path=None, args=None):
         else:
             config_dir = None
             config_file = args.config_file
-        unblocking = args.unblocking
     else:
         config_dir = dir_path
         config_file = file_path
-        unblocking = False
 
     # Extracting valid files
     if config_dir:
@@ -237,42 +243,22 @@ def main(file_path=None, dir_path=None, args=None):
     else:
         raise ValueError('Missing file_path or config_path.')
 
-    if unblocking:
-        print('######## IGNORING EXCEPTIONS ########')
-        for idx, file in enumerate(sorted(valid_files)):
-            try:
-                print('#' * 80)
-                print(f'# File {idx + 1} out of {valid_files}')
-                print(f'# Configuration file: {file}')
-                t_start = datetime.now()
-                print(OUTPUT_FORMAT.format('Starting run.', t_start.strftime(TIME_FORMAT)))
-                print()
+    for idx, file in enumerate(sorted(valid_files)):
+        print('#' * 80)
+        print(f'# File {idx + 1} out of {valid_files}')
+        print(f'# Configuration file: {file}')
+        t_start = datetime.now()
+        print(OUTPUT_FORMAT.format('Starting run.', t_start.strftime(TIME_FORMAT)))
+        print()
 
-                full_run(config_dir, file)
+        full_run(config_dir, file)
 
-                t_end = datetime.now()
-                print(OUTPUT_FORMAT.format('Ending run.', t_end.strftime(TIME_FORMAT)))
-                dt = t_end - t_start
-                print('# Time required: {:.2} s'.format(dt.total_seconds()))
-            except Exception as e:
-                print(f'Run {file} has failed. ')
-                print(e)
-    else:
-        for idx, file in enumerate(sorted(valid_files)):
-            print('#' * 80)
-            print(f'# File {idx + 1} out of {valid_files}')
-            print(f'# Configuration file: {file}')
-            t_start = datetime.now()
-            print(OUTPUT_FORMAT.format('Starting run.', t_start.strftime(TIME_FORMAT)))
-            print()
-
-            full_run(config_dir, file)
-
-            t_end = datetime.now()
-            print(OUTPUT_FORMAT.format('Ending run.', t_end.strftime(TIME_FORMAT)))
-            dt = t_end - t_start
-            print('# Time required: {:.2f} s'.format(dt.total_seconds()))
+        t_end = datetime.now()
+        print(OUTPUT_FORMAT.format('Ending run.', t_end.strftime(TIME_FORMAT)))
+        dt = t_end - t_start
+        print('# Time required: {:.2f} s'.format(dt.total_seconds()))
 
 if __name__ == '__main__':
     args = parse_args()
     main(args=args)
+    csv_handler.save_data()

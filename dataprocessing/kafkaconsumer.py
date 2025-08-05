@@ -94,7 +94,7 @@ class ConsumerService:
         # get similar words 
         for target in tqdm(df.loc[:,"rid"], desc= "# build similarity list. "):
             time_start = datetime.now()
-            print(f"[ExecTime] probabilistic comparison starts ....................{time_start.strftime(TIME_FORMAT)}")
+            # print(f"[ExecTime] probabilistic comparison starts ....................{time_start.strftime(TIME_FORMAT)}")
             try:
                 if self.strategy_suppl == "basic":
                     similar = dynentity_resolution(self.model, target, self.config["similarity_list"]["top_k"])
@@ -105,10 +105,10 @@ class ConsumerService:
                     similar = self._filter_list(similar)
 
                 time_end = datetime.now()
-                print(f"[ExecTime] probabilistic comparison starts ....................{time_end.strftime(TIME_FORMAT)}")
-                print(f"[ExecTime] probabilistic comparison time-------------------{time_end - time_start}")
+                # print(f"[ExecTime] probabilistic comparison starts ....................{time_end.strftime(TIME_FORMAT)}")
+                # print(f"[ExecTime] probabilistic comparison time-------------------{time_end - time_start}")
 
-                print(f"[ExecTime] building list/graph starts ....................{time_end.strftime(TIME_FORMAT)}")
+                # print(f"[ExecTime] building list/graph starts ....................{time_end.strftime(TIME_FORMAT)}")
                 if similar != [] and similar is not None:
                     self.sim_list.add_similarity(target, similar)
 
@@ -125,8 +125,8 @@ class ConsumerService:
                 else:
                     pass
                 time_end_1 = datetime.now()
-                print(f"[ExecTime] building list/graph starts ....................{time_end_1.strftime(TIME_FORMAT)}")
-                print(f"[ExecTime] building list/graph time-------------------{time_end_1 - time_end}")
+                # print(f"[ExecTime] building list/graph starts ....................{time_end_1.strftime(TIME_FORMAT)}")
+                # print(f"[ExecTime] building list/graph time-------------------{time_end_1 - time_end}")
             except Exception as e:
                 self.app_logger.error(f"Error similarity building: {str(e)}")
                 self.debug_logger.error(traceback.print_exc())
@@ -144,7 +144,7 @@ class ConsumerService:
         
         # data preparation
         df = self._prepare_data(self.window_data)
-
+        print(df)
         # preprocessing exact matching for increments
         time_start = datetime.now()
         print(f"[ExecTime] preprocessing starts ....................{time_start.strftime(TIME_FORMAT)}")
@@ -152,7 +152,7 @@ class ConsumerService:
         time_end = datetime.now()
         print(f"[ExecTime] preprocessing ends ....................{time_end.strftime(TIME_FORMAT)}")
         print(f"[ExecTime] preprcessing time-------------------{time_end - time_start}")
-        
+        print(df)
         if not df.empty:
             # add new node to outputfile
             time_start = datetime.now()
@@ -222,11 +222,11 @@ class ConsumerService:
             df = self.process_window_data()
             if not df.empty:
                 time_start = datetime.now()
-                # print(f"[ExecTime] sim structure building starts................{time_start.strftime(TIME_FORMAT)}")
+                print(f"[ExecTime] sim structure building starts................{time_start.strftime(TIME_FORMAT)}")
                 self.build_matching_list(df, True)
                 time_end = datetime.now()
-                # print(f"[ExecTime] sim structure building ends.................{time_end.strftime(TIME_FORMAT)}")
-                # print(f"[ExecTime] sim structure building time---------------------{time_end - time_start}")
+                print(f"[ExecTime] sim structure building ends.................{time_end.strftime(TIME_FORMAT)}")
+                print(f"[ExecTime] sim structure building time---------------------{time_end - time_start}")
             self.window_data.clear()
             self.t_end_time = time.time()
             print(f'[Finished] the test finished, output file name: {self.output_file_name}, execution time(s): {self.t_end_time - self.t_start_time}')

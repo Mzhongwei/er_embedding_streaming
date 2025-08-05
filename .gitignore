@@ -4,6 +4,10 @@ config/config*
 config/test.yaml
 .DS_Store
 
+# Energy Conso Results
+emissions*.csv
+result*.csv
+
 # Created by .ignore support plugin (hsz.mobi)
 ### Python template
 # Byte-compiled / optimized / DLL files

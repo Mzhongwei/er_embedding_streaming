@@ -1,3 +1,4 @@
+import random
 from tqdm import tqdm
 import traceback
 
@@ -17,10 +18,11 @@ class RandomWalk:
     ):
         i_graph = graph.get_graph()
         self.walk = []
+        
         # find node and its neighbors
         starting_node = i_graph.vs[starting_node_index]
         starting_node_name = starting_node['name']
-        app_debug.info(f"root name: {starting_node_name}")
+        # app_debug.info(f"root name: {starting_node_name}")
         # first step 
         if starting_node['node_class']['isfirst']:
             self.walk = [starting_node_name]
@@ -77,6 +79,96 @@ class RandomWalk:
     def get_reversed_walk(self):
         return self.walk[::-1]
 
+class RandomWalk_MetaPath:
+    def __init__(
+        self,
+        graph,
+        starting_node_index,
+        sentence_len,
+        meta_path
+    ):
+        i_graph = graph.get_graph()
+        self.walk = []
+        # find node and its neighbors
+        current_node = i_graph.vs[starting_node_index]
+        current_node_indice = starting_node_index
+        self.walk.append(current_node['name'])
+        # init for the second node
+        meta_index = 1 
+        
+        # the next steps
+        sentence_step = len(self.walk)
+        while sentence_step < sentence_len:
+            try:
+                next_type = meta_path[meta_index % len(meta_path)]
+                sampler = graph.get_sampler(current_node_indice)
+                next_node_indice = random.choice(sampler[next_type])
+                next_node = i_graph.vs[next_node_indice]
+                self.walk.append(next_node['name'])
+                current_node = next_node
+                current_node_indice = next_node_indice
+            except Exception:
+                    print(f"NO neighbors found for node: {current_node_indice}, name: {current_node['name']}. Looking for node type: {next_type}")
+                    app_debug.error(f"NO neighbors found for node: {current_node}, name: {current_node['name']}. Looking for node type: {next_type}")
+                    break
+            sentence_step += 1
+            meta_index += 1
+
+    def get_walk(self):
+        return self.walk
+
+    def get_reversed_walk(self):
+        return self.walk[::-1]
+
+def start_walk(roots_index, graph, walks_number, walk_length, write_walks, walk_rules):
+    sentences = []
+    sentence_counter = 0
+    pbar = tqdm(desc="# Sentence generation progress: ", total=len(roots_index)*walks_number)
+    for root in roots_index:
+        # if cell in intersection:
+        ######## random walk for each node
+        walks = []
+        for _r in range(walks_number):
+            try: 
+                if isinstance(walk_rules, bool):
+                    w = RandomWalk(
+                        graph,
+                        root,
+                        walk_length,
+                        walk_rules
+                    )
+                else: 
+                    w = RandomWalk_MetaPath(
+                        graph,
+                        root,
+                        walk_length,
+                        walk_rules
+                    )
+            except Exception as e:
+                print("node: ", _r)
+                print(e)
+                print(traceback.print_exc())
+                break
+            
+            if w.get_walk() != []:
+                walks.append(w.get_walk())
+            else:
+                raise ValueError(f"random walk anormal")
+
+        if write_walks:
+            if len(walks) > 0:
+                ws = [" ".join(_) for _ in walks]
+                s = "\n".join(ws) + "\n"
+                walk_info.info(s)
+            else:
+                pass
+        sentences += walks
+        sentence_counter += walks_number
+
+        pbar.update(walks_number)
+    pbar.close()
+    return sentences
+
 def dynrandom_walks_generation(configuration, graph):
     """
     Traverse the graph using different random walks strategies.
@@ -84,55 +176,28 @@ def dynrandom_walks_generation(configuration, graph):
     :param graph: graph generated starting from the input dataframe
     :return: the collection of random walks
     """
-    sentences = []
+    
     walk_length = int(configuration['walks']['walk_length'])
     backtrack = configuration['walks']['backtrack']
     walks_number = configuration['walks']['walks_number']
+    meta_path = configuration['graph']['meta_path']
+    write_walks = configuration['walks']['write_walks']
 
-    roots_index = graph.dyn_roots
-    
-
-    # ########### Random walks ############
-    sentence_counter = 0
     if walks_number > 0:
-        pbar = tqdm(desc="# Sentence generation progress: ", total=len(roots_index)*configuration['walks']['walks_number'])
-        for root in roots_index:
-            # if cell in intersection:
-            ######## random walk for each node
-            walks = []
-            for _r in range(walks_number):
-                try:
-
-                    w = RandomWalk(
-                        graph,
-                        root,
-                        walk_length,
-                        backtrack
-                    )
-                except Exception as e:
-                    print("node: ", _r)
-                    print(e)
-                    print(traceback.print_exc())
-                    break
-                
-                if w.get_walk() != []:
-                    walks.append(w.get_walk())
-                else:
-                    raise ValueError(f"random walk anormal")
-
-            if configuration['walks']['write_walks']:
-                if len(walks) > 0:
-                    ws = [" ".join(_) for _ in walks]
-                    s = "\n".join(ws) + "\n"
-                    walk_info.info(s)
-                else:
-                    pass
-            sentences += walks
-            sentence_counter += walks_number
-           
-            pbar.update(walks_number)
-        pbar.close()
-
-    graph.dyn_roots.clear()
-
+        ############ Random walks ############
+        if not meta_path:
+            roots_index = graph.dyn_roots
+            sentences = start_walk(roots_index, graph, walks_number, walk_length, write_walks, backtrack)
+            graph.dyn_roots.clear()
+        else:
+            if isinstance(meta_path, list):
+                sentences = []
+                for path in meta_path:
+                    roots_index = graph.dyn_roots[path[0]]
+                    sentences += start_walk(roots_index, graph, walks_number, walk_length, write_walks, path)
+                    graph.dyn_roots[path[0]].clear()
+            else:
+                roots_index = graph.dyn_roots[meta_path[0]]
+                sentences = start_walk(roots_index, graph, walks_number, walk_length, write_walks, meta_path)
+                graph.dyn_roots[meta_path[0]].clear()
     return sentences

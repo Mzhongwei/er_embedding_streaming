@@ -10,3 +10,5 @@ eva:
   approximate: 16
   # visualization of result or not
   sim_vis: true
+
+source_a: 0

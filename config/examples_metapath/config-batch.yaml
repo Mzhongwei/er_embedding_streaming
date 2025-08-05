@@ -1,18 +1,23 @@
-output_file_name: "test"
+# mandatory config 
+task: batch
+dataset_file: /home/zhongwei/Data_integration/data/test_for_metapath/dirty_dblp_acm/tableA.csv
+
+# optional config
+output_file_name: dirty_dblp_acm_cb
 
 log:
   path: "pipeline/logging"
 
 graph:
   # node types explained in README
-  meta_path: []
+  meta_path: [['rid', 'title', 'authors', 'title'], ['title', 'venue']]
   node_types:
-    - "7#__tn"
-    - "7$__tt"
-    - "7$__st"
+    - "5#__tn"
+    - "5$__tt"
+    - "5$__st"
     - "3$__idx"
     - "1$__cid"
-  flatten: "no"                  # split prefix for nodes
+  flatten: "tt"                  # split prefix for nodes
   smoothing_method: "no"         # smooth method: log/no
   directed: false                # whether the graph is directed
 

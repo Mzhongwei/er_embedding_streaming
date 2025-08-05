@@ -5,6 +5,7 @@ log:
 
 graph:
   # node types explained in README
+  meta_path: []
   node_types:
     - "7#__tn"
     - "7$__tt"

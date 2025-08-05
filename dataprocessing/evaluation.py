@@ -132,9 +132,12 @@ def _get_match_pairs(data_dict, source_a):
                 el = (item_matching, item_matched)
             
             # because of dataset constraint, limit the comparison between A and B
-            for id in el:
-                if id < source_a:
-                    matchpair_set.add(el)
+            if source_a == 0:
+                print(f"[WARNING] calculate metrics without defining the records number of source A")
+            elif source_a > 0:
+                for id in el:
+                    if id < source_a:
+                        matchpair_set.add(el)
     return matchpair_set
 
 def _get_similar_pairs(data_dict, n, appr, seuil):
@@ -232,8 +235,8 @@ def compare_ground_truth(configuration):
             recall = correct_matches / total_relevant_matches if total_relevant_matches != 0 else 0.0
             f1_score = 2*precision*recall / (precision + recall) if (precision + recall) != 0 else 0.0
 
-            if recall > f_recall:
-            # if f1_score > f_f1_score:
+            # if recall > f_recall:
+            if f1_score > f_f1_score:
                 f_seuil = seuil
                 f_total_predicted_matches = total_predicted_matches
                 f_correct_matches = correct_matches
@@ -247,13 +250,13 @@ def compare_ground_truth(configuration):
     
 
     # print results
-    print(f'''Evaluation result for {similarity_file}: \n seuil: {f_seuil} \n k: {f_k} \n correct matches: {f_correct_matches} \n total number of predicted matches: {f_total_predicted_matches} \n total number of matches in groud truth file: {f_total_relevant_matches} \n \n precision: {f_precision} \n recall: {f_recall} \n f1 score: {f_f1_score}''')
+    print(f'''Evaluation result for {similarity_file}: \n threshold: {f_seuil} \n top k records: {f_k} \n correct matches: {f_correct_matches} \n total number of predicted matches: {f_total_predicted_matches} \n total number of matches in groud truth file: {f_total_relevant_matches} \n \n precision: {f_precision} \n recall: {f_recall} \n f1 score: {f_f1_score}''')
 
     # output results to log file
     dir_name = "evaluation"
     Path(f'''{configuration['log']['path']}/{dir_name}''').mkdir(parents=True, exist_ok=True)
     logger = write_log(f'''{configuration['log']['path']}''', dir_name, dir_name)
     
-    logger.info(f'''[RESULTS] Evaluation result of similarity list in file [{similarity_file}] :\n seuil: {f_seuil} \n top k records: {f_k} \n decimal places retaining for the similarity: {appr} : \n correct matches: {f_correct_matches} \n total number of predicted matches: {f_total_predicted_matches} \n total number of matches in groud truth file: {f_total_relevant_matches} \n \n precision: {f_precision} \n recall: {f_recall} \n f1 score: {f_f1_score}''')
+    logger.info(f'''[RESULTS] Evaluation result of similarity list in file [{similarity_file}] :\n threshold: {f_seuil} \n top k records: {f_k} \n decimal places retaining for the similarity: {appr} : \n correct matches: {f_correct_matches} \n total number of predicted matches: {f_total_predicted_matches} \n total number of matches in groud truth file: {f_total_relevant_matches} \n \n precision: {f_precision} \n recall: {f_recall} \n f1 score: {f_f1_score}''')
     logger.info(s)
     # return precision, recall, f1_score

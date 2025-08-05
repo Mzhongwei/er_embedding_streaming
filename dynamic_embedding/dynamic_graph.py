@@ -18,12 +18,13 @@ app_debug = write_log("pipeline/logging", "debug", "dynamic_graph")
 
 
 class DynGraphIgraph:
-    def __init__(self, node_types=None, flatten=[], directed=False, smooth=None):
+    def __init__(self, node_types=None, flatten=[], directed=False, smooth=None, meta_path=None):
         self.graph = ig.Graph(directed=directed)
         self.node_classes = {}  # prefix -> class ID (for node_class logic) ex. {'idx': 5, 'cid': 0}
         self.node_is_numeric = {} # ex. {'idx' : false, 'cid': false}
         self.to_flatten = flatten if flatten != 'no' else []
-        self.dyn_roots=set()
+        self.meta_path = []
+        self.dyn_roots=None
         self.samplers = []
 
         # init records number (idx)
@@ -38,6 +39,34 @@ class DynGraphIgraph:
         if node_types:
             self._extract_node_types(node_types)
             self._check_flatten()
+        
+        # set meta_path and meta_link
+        if meta_path:
+            self.meta_path = meta_path
+            self.meta_link = []
+            self.meta_node = set()
+            paths = meta_path if isinstance(meta_path[0], list) else [meta_path]
+            for path in paths:
+                # set meta link
+                for a, b in zip(path[:-1], path[1:]):
+                    meta_link = tuple(sorted([a, b]))
+                    if meta_link not in self.meta_link:
+                        self.meta_link.append(meta_link)
+                # set meta node
+                for node_type in path:
+                    self.meta_node.add(node_type)
+            # print(self.meta_node)
+
+        # set self.dyn_roots
+        if meta_path:
+            self.dyn_roots = dict()
+            if isinstance(meta_path[0], list):
+                for path in meta_path:
+                    self.dyn_roots[path[0]] = set()
+            else:
+                self.dyn_roots[meta_path[0]] = set()
+        else:
+            self.dyn_roots = set()
 
     def _extract_node_types(self, node_types):
         for node_type in node_types:
@@ -81,8 +110,9 @@ class DynGraphIgraph:
         self.graph['num_ids'] = int(float(self.graph['num_ids']))
         self._extend_sampler(self.graph.vcount())
         # rebuild vertex attributes
-        for v in self.graph.vs:
-            v['node_class'] = self._update_node_class(v["type"])
+        if not self.meta_path:
+            for v in self.graph.vs:
+                v['node_class'] = self._update_node_class(v["type"])
         for v in self.graph.vs:
             self._update_neighbors(v.index)
             v["test_pretraining"] = True
@@ -112,7 +142,7 @@ class DynGraphIgraph:
 
         : return node.index(int): the vertex index in the graph involved in the update process
         '''
-
+        # print('update nodes...')
         if self.graph.vcount() == 0:
             node = self._add_vertex(node_name, node_prefix)
         else:
@@ -156,21 +186,37 @@ class DynGraphIgraph:
 
     def _add_vertex(self, node_name, node_prefix):
         
-        # add to graph
-        node = self.graph.add_vertex(
-            name=node_name,
-            type=node_prefix,
-            numeric=self.node_is_numeric.get(node_prefix, False),  # properties of value
-            node_class=self._update_node_class(node_prefix),       # properties for sample
-            appearing_frequency=0,
-            frequency_in_graph = 1,
-            test_pretraining=False,
-            test_neighbors_freq={}
-        )
-    
-        if node["node_class"]['isroot']:
-            self.dyn_roots.add(node.index)
-        return node
+        if self.meta_path:
+            # add to graph
+            node = self.graph.add_vertex(
+                name=node_name,
+                type=node_prefix,
+                appearing_frequency=0,
+                frequency_in_graph = 1,
+                test_pretraining=False,
+                test_neighbors_freq={}
+            )
+            # print(node_prefix)
+            if node_prefix in self.dyn_roots.keys():
+                # print(self.dyn_roots.keys())
+                self.dyn_roots[node_prefix].add(node.index)
+            return node
+        else:
+            # add to graph
+            node = self.graph.add_vertex(
+                name=node_name,
+                type=node_prefix,
+                numeric=self.node_is_numeric.get(node_prefix, False),  # properties of value
+                node_class=self._update_node_class(node_prefix),       # properties for sample
+                appearing_frequency=0,
+                frequency_in_graph = 1,
+                test_pretraining=False,
+                test_neighbors_freq={}
+            )
+        
+            if node["node_class"]['isroot']:
+                self.dyn_roots.add(node.index)
+            return node
 
     def _update_node_class(self, prefix):
         # get some attributes for random walk
@@ -182,27 +228,43 @@ class DynGraphIgraph:
         }
         return node_class_dict
     
-    def _update_neighbors(self, index):        
-        # store all neighbors' name in a list as an attribute of node with "node_name"
+    def _update_neighbors(self, index): 
         v = self.graph.vs[index]
         neighbors = self.graph.neighbors(index, mode='OUT') # all edges are added in two direction, so we get the same result for mode "in"/"out"/"all"
-
-        if not self.graph.is_directed():
-            sampler = NodeSampler(neighbors=neighbors, weighted=False, threshold=1000)
-                      
-        else:
-            weights = []
+        
+        sampler = dict()
+        if self.meta_path != []:
             for el in neighbors:
-                eid = self.graph.get_eid(v, el)
-                w = self.graph.es[eid]['weight'] if 'weight' in self.graph.es[eid].attributes() else 1.0
-                weights.append(w)
-            sampler = NodeSampler(neighbors=neighbors, weighted=True, threshold=50, weights=weights)
+                # el: index of neighbors
+                node_type = self.graph.vs[el]["type"]
+                if sampler:
+                    if node_type not in sampler:
+                        sampler[node_type] = []
+                else:
+                    sampler[node_type] = []
+                # do not repete
+                if el not in sampler[node_type]:
+                    sampler[node_type].append(el)
+            self.samplers[index] = sampler
+        else:       
+            # store all neighbors' name in a list as an attribute of node with "node_name"
+            
+            if not self.graph.is_directed():
+                sampler = NodeSampler(neighbors=neighbors, weighted=False, threshold=1000)
+                        
+            else:
+                weights = []
+                for el in neighbors:
+                    eid = self.graph.get_eid(v, el)
+                    w = self.graph.es[eid]['weight'] if 'weight' in self.graph.es[eid].attributes() else 1.0
+                    weights.append(w)
+                sampler = NodeSampler(neighbors=neighbors, weighted=True, threshold=50, weights=weights)
 
-        if not v["node_class"]["isfirst"]:
-            sampler.update_firstnode_list([self.graph.vs[idx]["node_class"]["isfirst"] for idx in neighbors])
+            if not v["node_class"]["isfirst"]:
+                sampler.update_firstnode_list([self.graph.vs[idx]["node_class"]["isfirst"] for idx in neighbors])
 
-        # add or overwrite sampler
-        self.samplers[index] = sampler
+            # add or overwrite sampler
+            self.samplers[index] = sampler
 
     def get_sampler(self, index):
         if index < len(self.samplers):
@@ -271,47 +333,75 @@ class DynGraphIgraph:
         :param df: data in formet of dataframe
         '''
         affected_nodes = set()
-        # Iterate over all rows in the df
-        for _, df_row in tqdm(df.iterrows(), total=len(df), desc="# Building/Updating graph"):
-            # get row id and update node
-            rid_node = str(df_row['rid'])
-            rid_index = self._update_node(rid_node, "idx")
 
-            affected_nodes.add(rid_index)
-            # Remove nans from the row
-            row = df_row.dropna()
-            # Create a node for the current row id.
-            for cid_node in df.columns:
-
-                if cid_node != "rid":
-                    try:
-                        # get attribute and update node
-                        cid_index = self._update_node(cid_node, "cid")
-                        affected_nodes.add(cid_index)
-
-                        # get instance and update node
-                        og_value = row[cid_node]
-                        # Convert cell values to strings, None or list.
-                        token_list, is_numeric = convert_token_value(og_value)
+        if self.meta_path:
+            for _, df_row in tqdm(df.iterrows(), total=len(df), desc="# Building/Updating graph"):
+                values = {}
+                for col in df.columns:
+                    if col in self.meta_node:
+                        if col not in values:
+                            values[col] = []
+                        token_list, _ = convert_token_value(df_row[col])
                         if token_list is not None:
                             for el in token_list:
-                                if is_numeric:
-                                    node_prefix = "tn"
-                                else:
-                                    node_prefix = "tt"
-                                instance_index = self._update_instance_vertex_edge(cid_index, rid_index, el, node_prefix)
-                                affected_nodes.update(instance_index)
-                    except KeyError:
-                        continue
-        
+                                index = self._update_node(el, col)
+                                if index not in values[col]:
+                                    values[col].append(index)
+                                affected_nodes.add(index)
+                        else:
+                            token = "nan"
+                            index = self._update_node(token, col)
+                            if index not in values[col]:
+                                values[col].append(index)
+                            affected_nodes.add(index)
+                app_debug.info(values)
+                for meta_link in self.meta_link:
+                    a, b = meta_link
+                    if a in values and b in values:
+                        for value1 in values[a]:
+                            for value2 in values[b]:
+                                app_debug.info(f"{a}: {self.graph.vs[value1]['name']}, {b}: {self.graph.vs[value2]['name']}")
+                                self._add_edge(value1, value2)    
+
+        else:
+            # Iterate over all rows in the df
+            for _, df_row in tqdm(df.iterrows(), total=len(df), desc="# Building/Updating graph"):
+                # get row id and update node
+                rid_node = str(df_row['rid'])
+                rid_index = self._update_node(rid_node, "idx")
+
+                affected_nodes.add(rid_index)
+                # Remove nans from the row
+                row = df_row.dropna()
+                # Create a node for the current row id.
+                for cid_node in df.columns:
+
+                    if cid_node != "rid":
+                        try:
+                            # get attribute and update node
+                            cid_index = self._update_node(cid_node, "cid")
+                            affected_nodes.add(cid_index)
+
+                            # get instance and update node
+                            og_value = row[cid_node]
+                            # Convert cell values to strings, None or list.
+                            token_list, is_numeric = convert_token_value(og_value)
+                            if token_list is not None:
+                                for el in token_list:
+                                    if is_numeric:
+                                        node_prefix = "tn"
+                                    else:
+                                        node_prefix = "tt"
+                                    instance_index = self._update_instance_vertex_edge(cid_index, rid_index, el, node_prefix)
+                                    affected_nodes.update(instance_index)
+                        except KeyError:
+                            continue
+            
         # extend sampler list
         self._extend_sampler(self.graph.vcount())
         # update neighbors
         for index in affected_nodes:
             self._update_neighbors(index)
-            ## build roots list for graph
-            # if self.graph.vs[index]["node_class"]['isroot']:
-            #     self.dyn_roots.add(index)
     
     def _extend_sampler(self, num):
         """Expand the list for sampler so that it supports up to index"""
@@ -371,7 +461,8 @@ def dyn_graph_generation(configuration):
     node_types = configuration['graph']['node_types']
     directed = configuration['graph']['directed']
     smooth = configuration['graph']['smoothing_method']
-    g = DynGraphIgraph(node_types=node_types, flatten=flatten, directed=directed, smooth=smooth)
+    meta_path = configuration['graph']['meta_path']
+    g = DynGraphIgraph(node_types=node_types, flatten=flatten, directed=directed, smooth=smooth, meta_path=meta_path)
     t_end = datetime.now()
     dt = t_end - t_start
     print()
