@@ -1,3 +1,4 @@
+task: batch
 output_file_name: "test"
 
 log:
@@ -6,27 +7,38 @@ log:
 graph:
   # node types explained in README
   meta_path: []
+  # tn: numerical instance, tt: textual instance, st: instence after tokenization
   node_types:
     - "7#__tn"
     - "7$__tt"
     - "7$__st"
     - "3$__idx"
     - "1$__cid"
-  flatten: "no"                  # split prefix for nodes
-  smoothing_method: "no"         # smooth method: log/no
-  directed: false                # whether the graph is directed
+  # split prefix for nodes, "no" / "tt"
+  flatten: "tt"       
+  # smooth method: log/no           
+  smoothing_method: "no" 
+  # whether the graph is directed        
+  directed: false                
 
 walks:
   write_walks: true
-  walk_length: 60                # step size
-  walks_number: 20               # number of sentences per root
-  backtrack: false               # whether to allow return to previous node
-  rw_stat: true                  # statistical result of random walk
+  # step size
+  walk_length: 60
+  # number of sentences per root        
+  walks_number: 20
+  # whether to allow return to previous node            
+  backtrack: false
+  # statistical result of random walk 
+  rw_stat: false
 
 embeddings:
-  learning_method: "skipgram"    # skipgram / CBOW
+  # skipgram / CBOW
+  learning_method: "skipgram"
   window_size: 3
+  negative: 5
+  epochs: 5
   min_count: 0
   n_dimensions: 300
-  training_algorithm: "word2vec" # word2vec / fasttext
+  training_algorithm: "word2vec"
   sampling_factor: 0.001

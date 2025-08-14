@@ -6,9 +6,10 @@ from gensim.models import Doc2Vec, FastText, Word2Vec
 
 
 def initialize_embeddings(
-    write_walks,
     dimensions,
     window_size,
+    negative,
+    epochs,
     min_count,
     training_algorithm="word2vec",
     learning_method="skipgram",
@@ -20,8 +21,6 @@ def initialize_embeddings(
     experimental phase.
 
     :param output_embeddings_file: path to save the embeddings file into.
-    :param walks: path to the walks file (if write_walks == True), list of walks otherwise.
-    :param write_walks: flag used to read walks from a file rather than taking them from memory.
     :param dimensions: number of dimensions to be used when training the model
     :param window_size: size of the context window
     :param training_algorithm: either fasttext or word2vec.
@@ -35,26 +34,19 @@ def initialize_embeddings(
             sg = 0
         else:
             raise ValueError("Unknown learning method {}".format(learning_method))
-        if write_walks:
-            model = Word2Vec(
-                vector_size=dimensions,
-                window=window_size,
-                min_count=min_count,
-                sg=sg,
-                workers=workers,
-                sample=sampling_factor,
-            )
-            return model
-        else:
-            model = Word2Vec(
-                vector_size=dimensions,
-                window=window_size,
-                min_count=min_count,
-                sg=sg,
-                workers=workers,
-                sample=sampling_factor,
-            )
-            return model
+        
+        model = Word2Vec(
+            vector_size=dimensions,
+            window=window_size,
+            min_count=min_count,
+            sg=sg,
+            workers=workers,
+            sample=sampling_factor,
+            negative=negative,
+            epochs=epochs
+        )
+        return model
+    
     elif training_algorithm == "doc2vec":
         if learning_method == "skipgram":
             sg = 1
@@ -62,41 +54,28 @@ def initialize_embeddings(
             sg = 0
         else:
             raise ValueError("Unknown learning method {}".format(learning_method))
-        if write_walks:
-            model = Doc2Vec(
-                size=dimensions,
-                window=window_size,
-                min_count=min_count,
-                sg=sg,
-                workers=workers,
-                sample=sampling_factor,
-            )
-            return model
-        else:
-            model = Doc2Vec(
-                size=dimensions,
-                window=window_size,
-                min_count=min_count,
-                sg=sg,
-                workers=workers,
-                sample=sampling_factor,
-            )
-            return model
+
+        model = Doc2Vec(
+            size=dimensions,
+            window=window_size,
+            min_count=min_count,
+            sg=sg,
+            workers=workers,
+            sample=sampling_factor,
+            negative=negative,
+            epochs=epochs
+        )
+        return model
+
     elif training_algorithm == "fasttext":
         print("Using Fasttext")
-        if write_walks:
-            model = FastText(
-                window=window_size,
-                min_count=min_count,
-                workers=workers,
-                vector_size=dimensions,
-            )
-            return model
-        else:
-            model = FastText(
-                vector_size=dimensions,
-                workers=workers,
-                min_count=min_count,
-                window=window_size,
-            )
-            return model
+        
+        model = FastText(
+            vector_size=dimensions,
+            workers=workers,
+            min_count=min_count,
+            window=window_size,
+            negative=negative,
+            epochs=epochs
+        )
+        return model

@@ -144,11 +144,11 @@ class ConsumerService:
         
         # data preparation
         df = self._prepare_data(self.window_data)
-        print(df)
         # preprocessing exact matching for increments
         time_start = datetime.now()
         print(f"[ExecTime] preprocessing starts ....................{time_start.strftime(TIME_FORMAT)}")
         df = self._em_inc(df)
+        print(df)
         time_end = datetime.now()
         print(f"[ExecTime] preprocessing ends ....................{time_end.strftime(TIME_FORMAT)}")
         print(f"[ExecTime] preprcessing time-------------------{time_end - time_start}")
@@ -181,7 +181,7 @@ class ConsumerService:
                     time_start = datetime.now()
                     print(f"[ExecTime] retraining embedding model starts ....................{time_start.strftime(TIME_FORMAT)}")
                     self.model.build_vocab(walks)
-                    self.model.train(walks, total_examples=self.model.corpus_count, epochs=10)
+                    self.model.train(walks, total_examples=self.model.corpus_count, epochs=self.config["embeddings"]["inc_epochs"])
                     if self.strategy_suppl == "faiss":
                         self.strategy_model = FaissIndex(self.model)
                     time_end = datetime.now()
@@ -192,7 +192,7 @@ class ConsumerService:
                     time_start = datetime.now()
                     print(f"[ExecTime] retraining embedding model starts ....................{time_start.strftime(TIME_FORMAT)}")
                     self.model.build_vocab(walks, update=True)
-                    self.model.train(walks, total_examples=len(walks), epochs=5) # An epoch is one complete pass through the entire training data.
+                    self.model.train(walks, total_examples=len(walks), epochs=self.config['embeddings']['inc_epochs']) # An epoch is one complete pass through the entire training data.
                     if self.strategy_suppl == "faiss":
                         if self.strategy_model == None:
                             self.strategy_model = FaissIndex(self.model)

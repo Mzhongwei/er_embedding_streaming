@@ -84,9 +84,11 @@ def batch_driver(configuration):
     # training model
     embeddings_file = f"pipeline/embeddings/{configuration['output_file_name']}.embin"
     print("create a new model...")
-    model = initialize_embeddings(write_walks=configuration['walks']['write_walks'],
+    model = initialize_embeddings(
                 dimensions=configuration['embeddings']['n_dimensions'],
                 window_size=configuration['embeddings']['window_size'],
+                negative=configuration['embeddings']['negative'],
+                epochs=configuration['embeddings']['epochs'],
                 min_count=configuration['embeddings']['min_count'],
                 training_algorithm=configuration['embeddings']['training_algorithm'],
                 learning_method=configuration['embeddings']['learning_method'],
@@ -146,9 +148,11 @@ def streaming_driver(configuration):
         print(f"graph attributes: id_nums-{graph.get_id_nums()}, smooth method-{graph.get_smooth_method()}, directed-{graph.get_directed_info()}")
         ###### create an empty model
         print("Create a new model...")
-        model = initialize_embeddings(write_walks=configuration['walks']['write_walks'],
+        model = initialize_embeddings(
                     dimensions=configuration['embeddings']['n_dimensions'],
                     window_size=configuration['embeddings']['window_size'],
+                    negative=configuration['embeddings']['negative'],
+                    epochs=configuration['embeddings']['epochs'],
                     min_count=configuration['embeddings']['min_count'],
                     training_algorithm=configuration['embeddings']['training_algorithm'],
                     learning_method=configuration['embeddings']['learning_method'],

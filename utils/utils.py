@@ -3,6 +3,7 @@ import csv
 from io import StringIO
 import math
 import os
+import re
 import string
 import warnings
 import pathlib
@@ -155,12 +156,11 @@ def convert_token_value(original_value):
     
 def clean_str(value):
     value = value.lower().strip()
-    translation_table = str.maketrans({
-        '"': r'\"',
-        ',': '_',
-        ' ': '_'
-    })
-    return value.translate(translation_table)
+    # Replace all non-alphanumeric characters with “_”
+    value = re.sub(r'[^a-z0-9]+', '_', value)
+    # Remove the underscores at the beginning and end
+    value = value.strip('_')
+    return value
 
 def clean_date(value):
     date_formats = [

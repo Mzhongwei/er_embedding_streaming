@@ -17,21 +17,30 @@ graph:
     - "5$__st"
     - "3$__idx"
     - "1$__cid"
-  flatten: "tt"                  # split prefix for nodes
-  smoothing_method: "no"         # smooth method: log/no
-  directed: false                # whether the graph is directed
+  # split prefix for nodes
+  flatten: "tt"
+  # smooth method: log/no
+  smoothing_method: "no"
+  # whether the graph is directed
+  directed: fals                
 
 walks:
   write_walks: true
-  walk_length: 60                # step size
-  walks_number: 20               # number of sentences per root
-  backtrack: false               # whether to allow return to previous node
-  rw_stat: true                  # statistical result of random walk
+  # step size
+  walk_length: 60
+  # number of sentences per root
+  walks_number: 20
+  # whether to allow return to previous node
+  backtrack: false
+  # statistical result of random walk
+  rw_stat: true
 
 embeddings:
-  learning_method: "skipgram"    # skipgram / CBOW
+  # skipgram / CBOW
+  learning_method: "skipgram"
   window_size: 3
   min_count: 0
   n_dimensions: 300
-  training_algorithm: "word2vec" # word2vec / fasttext
+  # word2vec / fasttext
+  training_algorithm: "word2vec"
   sampling_factor: 0.001

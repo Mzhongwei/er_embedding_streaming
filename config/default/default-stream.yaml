@@ -1,3 +1,4 @@
+task: smatch
 output_file_name: "test"
 
 log:
@@ -6,45 +7,65 @@ log:
 graph:
   # node types explained in README
   meta_path: []
+  # tn: numerical instance, tt: textual instance, st: instence after tokenization
   node_types:
     - "7#__tn"
     - "7$__tt"
     - "7$__st"
     - "3$__idx"
     - "1$__cid"
-  flatten: "no"                  # split prefix for nodes
-  smoothing_method: "no"         # smooth method: log/no
-  directed: false                # whether the graph is directed
+  # split prefix for nodes, "no" / "tt"
+  flatten: "tt"       
+  # smooth method: log/no           
+  smoothing_method: "no" 
+  # whether the graph is directed        
+  directed: false
 
 walks:
   write_walks: true
-  walk_length: 60                # step size
-  walks_number: 20               # number of sentences per root
-  backtrack: false               # whether to allow return to previous node
-  rw_stat: false                 # statistical result of random walk
+  # step size
+  walk_length: 60
+  # number of sentences per root        
+  walks_number: 20
+  # whether to allow return to previous node            
+  backtrack: false
+  # statistical result of random walk 
+  rw_stat: falses
 
 embeddings:
-  learning_method: "skipgram"    # skipgram / CBOW
+  # skipgram / CBOW
+  learning_method: "skipgram"
   window_size: 3
+  negative: 5
+  epochs: 5
+  inc_epochs: 10
   min_count: 0
   n_dimensions: 300
-  training_algorithm: "word2vec" # word2vec / fasttext
+  training_algorithm: "word2vec"
   sampling_factor: 0.001
   
 similarity_list:
-  top_k: 10                      # top K most similar entries to keep
-  simlist_n: 10                  # how many records to evaluate similarity for
-  simlist_show: 5                # how many to print/show
-  strategy_suppl: "basic"        # similarity algorithm: basic / faiss
-  output_format: "db"            # db / json / parquet
+  # top K most similar entries to keep
+  top_k: 10
+  # how many records to evaluate similarity for
+  simlist_n: 10
+  # how many to print/show
+  simlist_show: 5
+  # similarity algorithm: basic / faiss
+  strategy_suppl: "basic"
+  # db / json / parquet / graphml
+  output_format: "graphml"
+  # list / graph
+  sim_structure: "graph"
 
 kafka:
   topicid: "entity_resolution_process"
   groupid: "er_group"
   bootstrap_servers: "localhost"
   port: 9092
-
-  # sliding window strategy
-  window_strategy: "count"       # "count" or "time"
-  window_count: 50               # used if strategy is "count"
-  update_frequency: 0            # 0 = tumbling window, otherwise stride size
+  # sliding window strategy, "count" or "time"
+  window_strategy: "count"
+  # used if strategy is "count"
+  window_count: 50
+  # 0 = tumbling window, otherwise stride size
+  update_frequency: 0
