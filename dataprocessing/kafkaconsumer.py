@@ -1,4 +1,5 @@
 import json
+import os
 import queue
 import signal
 import socket
@@ -93,7 +94,6 @@ class ConsumerService:
         '''build sim list and output to db file'''
         # get similar words 
         for target in tqdm(df.loc[:,"rid"], desc= "# build similarity list. "):
-            time_start = datetime.now()
             # print(f"[ExecTime] probabilistic comparison starts ....................{time_start.strftime(TIME_FORMAT)}")
             try:
                 if self.strategy_suppl == "basic":
@@ -104,11 +104,6 @@ class ConsumerService:
                 if int(self.config['source_num']) > 0 and similar != []:
                     similar = self._filter_list(similar)
 
-                time_end = datetime.now()
-                # print(f"[ExecTime] probabilistic comparison starts ....................{time_end.strftime(TIME_FORMAT)}")
-                # print(f"[ExecTime] probabilistic comparison time-------------------{time_end - time_start}")
-
-                # print(f"[ExecTime] building list/graph starts ....................{time_end.strftime(TIME_FORMAT)}")
                 if similar != [] and similar is not None:
                     self.sim_list.add_similarity(target, similar)
 
@@ -135,7 +130,39 @@ class ConsumerService:
         if not last_win:
             print(f"Waiting for the next data window...")
         print()
-                
+
+    def _record_similarity_changement(self):
+        records = []
+        topk_remain = self.config["similarity_list"]["top_k"]
+        
+        for i in range(int(self.graph.get_id_nums())+1):
+            target = f"idx__{i}"
+            try:
+                similar =  dynentity_resolution(self.model, target, topk_remain)
+            except Exception as e:
+                print(f"[Error] can not find similar records for {target}: {str(e)}")
+            if int(self.source_num) > 0 and similar != []:
+                similar = self._filter_result(target, similar)
+            if similar != [] and similar is not None:
+                topk_list = sorted(similar, key=lambda x: x[1], reverse=True)[:topk_remain]
+                rank=1
+                for el in topk_list:
+                    records.append({
+                        "round": self.count,
+                        "target_id": target,
+                        "neighbor_rank": rank,
+                        "neighbor_id": el[0],
+                        "similarity": el[1]
+                    })
+                    rank += 1
+
+        df_new = pd.DataFrame(records)
+        output_file = f"pipeline/stat/sim_changement-{self.output_file_name}.csv"
+        if not os.path.exists(output_file):
+            df_new.to_csv(output_file, index=False)
+        else:
+            df_new.to_csv(output_file, mode="a", header=False, index=False)
+        print(f"{datetime.now()}: Top-{topk_remain} similar data for {len(records)} records are exported to {output_file}")          
 
     def process_window_data(self):
         """Process data of the current window """
@@ -172,6 +199,7 @@ class ConsumerService:
             print(f"[ExecTime] random walk time---------------------{time_end - time_start}")
 
             if walks == []:
+                print("[Warning] Random walk do not executed ...")
                 raise ValueError(f"Random walk anomaly")
 
             try:
@@ -224,6 +252,7 @@ class ConsumerService:
                 time_start = datetime.now()
                 print(f"[ExecTime] sim structure building starts................{time_start.strftime(TIME_FORMAT)}")
                 self.build_matching_list(df, True)
+                self._record_similarity_changement()
                 time_end = datetime.now()
                 print(f"[ExecTime] sim structure building ends.................{time_end.strftime(TIME_FORMAT)}")
                 print(f"[ExecTime] sim structure building time---------------------{time_end - time_start}")
@@ -261,6 +290,20 @@ class ConsumerService:
                 if int(float(t[0].split('__')[1])) <= int(self.config['source_num']):
                     result.append(t)
                     # print(t)
+        return result
+    
+    def _filter_result(self, target, similarity_list):
+        result = []
+        if similarity_list is not None and similarity_list != []:
+            if int(float(target.split('__')[1])) <= int(self.config['source_num']):
+                for t in similarity_list:
+                    if int(float(t[0].split('__')[1])) > int(self.config['source_num']):
+                        result.append(t)
+            else:
+                for t in similarity_list:
+                    if int(float(t[0].split('__')[1])) <= int(self.config['source_num']):
+                        result.append(t)
+
         return result
 
 
@@ -304,7 +347,9 @@ class ConsumerService:
                         self.app_logger.info("[STARTED] Receiving records...")
                         print("[STARTED] Receiving records...")
                         self.t_start_time = time.time()
-
+                        # sim_changement
+                        self.source_num=self.graph.get_id_nums()
+                        self.count=0
                     try:
                         ## Update metrics
                         # Update lag
@@ -383,6 +428,7 @@ class ConsumerService:
         df = self.process_window_data()
         if not df.empty:
             self.build_matching_list(df, False)
+            self._record_similarity_changement()
         end = time.time()
         self.metrics.update_window_data_processing_time((end - start) / len(self.window_data))
 

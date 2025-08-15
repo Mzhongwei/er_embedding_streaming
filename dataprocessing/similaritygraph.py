@@ -82,9 +82,9 @@ class SimilarityGraph:
             g2 = self._find_or_create_group(other)
 
             if score == 1.0:
-                # 合并 g2 → g1
+                # merge g2 → g1
                 self._merge_groups(g1, g2)
-                g1 = self.group_map[record]  # 更新当前主 group
+                g1 = self.group_map[record]  # update current main group
             else:
                 self._add_edge(g1, g2, score)
             self._limit_edges(g2)
@@ -97,11 +97,10 @@ class SimilarityGraph:
         except ValueError:
             return
         edges = self.graph.incident(v.index, mode="OUT")
-        if len(edges) <= self.most_similar_num:
-            return
-        weighted_edges = [(e, self.graph.es[e]["weight"]) for e in edges]
-        to_delete = sorted(weighted_edges, key=lambda x: x[1], reverse=True)[self.most_similar_num:]
-        self.graph.delete_edges([e for e, _ in to_delete])
+        if len(edges) > self.most_similar_num:
+            weighted_edges = [(e, self.graph.es[e]["weight"]) for e in edges]
+            to_delete = sorted(weighted_edges, key=lambda x: x[1], reverse=True)[self.most_similar_num:]
+            self.graph.delete_edges([e for e, _ in to_delete])
 
 
     def get_group_members(self, group_name):

@@ -22,7 +22,6 @@ class RandomWalk:
         # find node and its neighbors
         starting_node = i_graph.vs[starting_node_index]
         starting_node_name = starting_node['name']
-        # app_debug.info(f"root name: {starting_node_name}")
         # first step 
         if starting_node['node_class']['isfirst']:
             self.walk = [starting_node_name]
@@ -123,6 +122,8 @@ class RandomWalk_MetaPath:
 def start_walk(roots_index, graph, walks_number, walk_length, write_walks, walk_rules):
     sentences = []
     sentence_counter = 0
+    if roots_index == 0 or roots_index is None:
+        return
     pbar = tqdm(desc="# Sentence generation progress: ", total=len(roots_index)*walks_number)
     for root in roots_index:
         # if cell in intersection:
@@ -185,13 +186,13 @@ def dynrandom_walks_generation(configuration, graph):
 
     if walks_number > 0:
         ############ Random walks ############
+        sentences = []
         if not meta_path:
             roots_index = graph.dyn_roots
             sentences = start_walk(roots_index, graph, walks_number, walk_length, write_walks, backtrack)
             graph.dyn_roots.clear()
         else:
             if isinstance(meta_path, list):
-                sentences = []
                 for path in meta_path:
                     roots_index = graph.dyn_roots[path[0]]
                     sentences += start_walk(roots_index, graph, walks_number, walk_length, write_walks, path)

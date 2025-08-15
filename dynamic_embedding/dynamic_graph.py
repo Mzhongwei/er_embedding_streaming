@@ -138,7 +138,7 @@ class DynGraphIgraph:
         method1: regroup vertex values for all types, if value exists, return vertex index; if not, create a new vertex and return the newly created vertex index
         method2: regroup vertex only for attributes(col name), and create new vertex for each instance even its value exists already in the graph
         : param node_name(str): vertex value
-        : param node_prefix(str): values in list ["rid", "tt", "tn", "cid"]
+        : param node_prefix(str): without metapath: values in list ["rid", "tt", "tn", "cid"]; with metapath: value of col names
 
         : return node.index(int): the vertex index in the graph involved in the update process
         '''
@@ -169,6 +169,17 @@ class DynGraphIgraph:
         # ## END method2
 
         node["frequency_in_graph"] = node["frequency_in_graph"] + 1
+
+        # add roots
+        if self.meta_path:
+            # print(node_prefix)
+            if node_prefix in self.dyn_roots.keys():
+                # print(self.dyn_roots.keys())
+                self.dyn_roots[node_prefix].add(node.index)
+        else:
+            if node["node_class"]['isroot']:
+                self.dyn_roots.add(node.index)
+
         return node.index
                 
     def _update_token(self, ins_value, prefix):
@@ -182,6 +193,17 @@ class DynGraphIgraph:
                 ## if the node.name doesn't exist, create new vertex
                 node = self._add_vertex(ins_value, prefix)
         node["frequency_in_graph"] = node["frequency_in_graph"] + 1
+
+        # add roots 
+        if self.meta_path:
+            # print(node_prefix)
+            if prefix in self.dyn_roots.keys():
+                # print(self.dyn_roots.keys())
+                self.dyn_roots[prefix].add(node.index)
+        else:
+            if node["node_class"]['isroot']:
+                self.dyn_roots.add(node.index)
+
         return node.index           
 
     def _add_vertex(self, node_name, node_prefix):
@@ -196,10 +218,7 @@ class DynGraphIgraph:
                 test_pretraining=False,
                 test_neighbors_freq={}
             )
-            # print(node_prefix)
-            if node_prefix in self.dyn_roots.keys():
-                # print(self.dyn_roots.keys())
-                self.dyn_roots[node_prefix].add(node.index)
+            
             return node
         else:
             # add to graph
@@ -214,8 +233,6 @@ class DynGraphIgraph:
                 test_neighbors_freq={}
             )
         
-            if node["node_class"]['isroot']:
-                self.dyn_roots.add(node.index)
             return node
 
     def _update_node_class(self, prefix):
@@ -329,7 +346,10 @@ class DynGraphIgraph:
         return instances_index
 
     def build_relation(self, df):
-        ''' update graph without deduplication of instances
+        ''' update graph 
+        with metapath: no tokenization
+        without metapath: tokenization
+
         :param df: data in formet of dataframe
         '''
         affected_nodes = set()

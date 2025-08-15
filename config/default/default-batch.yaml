@@ -11,7 +11,7 @@ graph:
   node_types:
     - "7#__tn"
     - "7$__tt"
-    - "7$__st"
+    - "5$__st"
     - "3$__idx"
     - "1$__cid"
   # split prefix for nodes, "no" / "tt"
