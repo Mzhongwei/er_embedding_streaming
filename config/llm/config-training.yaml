@@ -1,0 +1,11 @@
+task: llm-training
+exp_name: test
+model: BERT
+train_batch_size: 16
+eval_batch_size: 16
+epochs: 15
+seed: 42
+trainset_path: ""
+testset_path: ""
+validset_path: ""
+testing: True

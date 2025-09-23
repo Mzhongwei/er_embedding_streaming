@@ -13,6 +13,10 @@ import warnings
 from gensim.models import FastText, Word2Vec
 
 from comparison_approaches.exact_matching import preprocessing_batch
+from dataprocessing.kafkaconsumer import ConsumerService
+from dataprocessing.metrics import Metrics
+from llm.testing import start_testing
+from llm.training import start_training
 
 
 
@@ -25,8 +29,10 @@ with warnings.catch_warnings():
     from dynamic_embedding.dynamic_embeddings import initialize_embeddings
     from dynamic_embedding.dynamic_sampling import dynrandom_walks_generation
     from dataprocessing.kafkaconsumer import start_kafka_consumer
-
+'''
+# search: consumption
 csv_handler = CSVHandler('/home/zhongwei/Data_integration/er_embedding_streaming/result.csv')   
+'''
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -54,6 +60,7 @@ def batch_driver(configuration):
     df_table["rid"] = ["idx__{}".format(i) for i in range(id_nums)] 
 
     #### preprocessing 
+    # TODO: add stape "preprocessing" into batch stage
     # list_to_compare, pairs, pairs_index = preprocessing_batch(df_table)
     # if pairs:
     #     print("testing")
@@ -80,7 +87,8 @@ def batch_driver(configuration):
     print(f"dyn roots len: {len(graph.dyn_roots)}")
 
     # random walk
-    walks = dynrandom_walks_generation(configuration, graph)
+    walks_number = configuration['walks']['walks_number']
+    walks = dynrandom_walks_generation(configuration, graph, walk_nums=walks_number)
     # training model
     embeddings_file = f"pipeline/embeddings/{configuration['output_file_name']}.embin"
     print("create a new model...")
@@ -95,7 +103,7 @@ def batch_driver(configuration):
                 sampling_factor=configuration['embeddings']['sampling_factor'])
     print("start training...")
     model.build_vocab(walks)
-    model.train(walks, total_examples=model.corpus_count, epochs=10)
+    model.train(walks, total_examples=model.corpus_count, epochs=configuration['embeddings']['epochs'])
     model.save(embeddings_file)
     print(f"-- Embeddings model saved, the file path: {embeddings_file}")
 
@@ -163,6 +171,16 @@ def streaming_driver(configuration):
     output_file_name = configuration['output_file_name']
     start_kafka_consumer(configuration, graph, model, output_file_name)
 
+def training_driver(configuration):
+    trainer = start_training(configuration)
+    if configuration['testing']:
+        start_testing(trainer)
+
+
+
+def testing_driver(configuration):
+    pass
+
 def evaluation_driver(configuration):
     compare_ground_truth(configuration)
 
@@ -195,7 +213,8 @@ def full_run(config_dir, config_file):
     path = Path(config_dir, config_file)
     configuration = load_yaml_config(path)
     # Checking the correctness of the configuration, setting default values for missing values.
-    configuration = check_config_validity(configuration)
+    # TODO: adapt the check function to llm mode
+    # configuration = check_config_validity(configuration)
 
     # Running the task specified in the configuration file.
 
@@ -205,9 +224,15 @@ def full_run(config_dir, config_file):
         evaluation_driver(configuration)
     elif configuration['task'] == "batch":
         batch_driver(configuration)
-
+    elif 'llm-train' in configuration['task']:
+        training_driver(configuration)
+    elif 'llm-test' in configuration['task']:
+        testing_driver(configuration)
+'''
+# search: consumption
 @track_emissions(offline=True, country_iso_code="FRA")
 @measure_energy(handler=csv_handler)
+'''
 def main(file_path=None, dir_path=None, args=None):
     results = None
     configuration = None
@@ -265,4 +290,7 @@ def main(file_path=None, dir_path=None, args=None):
 if __name__ == '__main__':
     args = parse_args()
     main(args=args)
+    '''
+    # search: consumption
     csv_handler.save_data()
+    '''

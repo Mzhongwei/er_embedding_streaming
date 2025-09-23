@@ -220,7 +220,7 @@ def compare_ground_truth(configuration):
     f_recall = 0
     f_f1_score = 0
     f_k = 0
-    for seuil in [i / 100 for i in range(5, 100, 5)]:
+    for seuil in [i / 100 for i in range(95, 0, -5)]:
         for k in range (1, 11):
             correct_matches = 0
             predicted_matches, s = _get_similar_pairs(similarity_list, k, appr, seuil)
@@ -235,8 +235,8 @@ def compare_ground_truth(configuration):
             recall = correct_matches / total_relevant_matches if total_relevant_matches != 0 else 0.0
             f1_score = 2*precision*recall / (precision + recall) if (precision + recall) != 0 else 0.0
 
-            # if recall > f_recall:
-            if f1_score > f_f1_score:
+            if recall > f_recall:
+            # if f1_score > f_f1_score:
                 f_seuil = seuil
                 f_total_predicted_matches = total_predicted_matches
                 f_correct_matches = correct_matches

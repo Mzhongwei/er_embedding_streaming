@@ -37,7 +37,7 @@ def _merge_with_defaults(user_config, default_config):
     return merged
 
 def _verify_gwe(config):
-    if config["graph"]["smoothing_method"] not in ["log", "no"]:
+    if config["graph"]["smoothing_method"] not in ["log", "no", "IDF", "ICF"]:
         raise ValueError("Unknown smoothing_method {}".format(config["smoothing_method"]))
 
     if config["embeddings"]["training_algorithm"] not in ["word2vec", "fasttext"]:
@@ -187,3 +187,16 @@ def data_cleaning(input):
         return res
     else:
         return str(input)
+
+def parse_idx_suffix(word: str, prefix: str = "idx__"):
+    """
+    Parse 'idx__<number>' -> <number> as int.
+    Be tolerant to '123.0' etc. Return None on failure.
+    """
+    if not isinstance(word, str) or not word.startswith(prefix):
+        return None
+    try:
+        suffix = word.split("__", 1)[1]
+        return int(float(suffix))
+    except Exception:
+        return None

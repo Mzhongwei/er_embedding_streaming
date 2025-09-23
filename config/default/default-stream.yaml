@@ -46,11 +46,11 @@ embeddings:
   
 similarity_list:
   # top K most similar entries to keep
-  top_k: 10
+  top_k: 3
   # how many records to evaluate similarity for
-  simlist_n: 10
+  simlist_n: 3
   # how many to print/show
-  simlist_show: 5
+  simlist_show: 3
   # similarity algorithm: basic / faiss
   strategy_suppl: "basic"
   # db / json / parquet / graphml
