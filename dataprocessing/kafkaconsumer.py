@@ -24,6 +24,7 @@ from dataprocessing.metrics import Metrics
 from dataprocessing.random_walk_analysis import random_walk_analysis
 from utils.write_log import write_log
 from utils.utils import TIME_FORMAT
+from confluent_kafka import Consumer, KafkaException, KafkaError
 
 task_queue = queue.Queue()
 consumer = None
@@ -401,14 +402,16 @@ class ConsumerService:
     def run(self):
         try:
             # prepare kafka consumer
-            self.consumer = KafkaConsumer(
-                self.config['kafka']['topicid'],
-                bootstrap_servers=f'{self.config["kafka"]["bootstrap_servers"]}:{self.config["kafka"]["port"]}',
-                value_deserializer=lambda x: json.loads(x.decode('utf-8')),
-                group_id=self.config['kafka']["groupid"],
-                enable_auto_commit=True,
-                auto_offset_reset='latest'
-            )
+            self.consumer = Consumer({
+                'bootstrap.servers': f'{self.config["kafka"]["bootstrap_servers"]}:{self.config["kafka"]["port"]}',
+                'group.id': self.config['kafka']["groupid"],
+                'auto.offset.reset': 'latest',   # latest / earliest
+                'enable.auto.commit': True
+            })
+
+            # subscribe a topic
+            self.consumer.subscribe([self.config['kafka']['topicid']])
+
         except Exception as e:
             self.app_logger.error(f"Fatal error in consumer service: {str(e)}")
             print(f"Fatal error in consumer service: {str(e)}")
@@ -418,60 +421,65 @@ class ConsumerService:
 
         empty_poll_count = 0
         max_empty_polls = 500  # 相当于约 50 秒内没消息就退出（poll 每次 100ms）
-        poll_timeout = 100  # ms
+        poll_timeout = 1.0  # s
 
         while True:
-            msg_pack = self.consumer.poll(timeout_ms=poll_timeout)  # Non-blocking batch pull
+            msg = self.consumer.poll(timeout_ms=poll_timeout)  # Non-blocking batch pull
 
-            if not msg_pack:
+            if msg is None:  # no new message
                 empty_poll_count += 1
                 if empty_poll_count >= max_empty_polls:
                     print("[INFO] No new messages for a while. Exiting consumer loop.")
                     break
-            else:
-                empty_poll_count = 0  # reset counter
+                continue
+            if msg.error():
+                if msg.error().code() == KafkaError._PARTITION_EOF:
+                    # end of partition
+                    continue
+                else:
+                    raise KafkaException(msg.error())
+            empty_poll_count = 0  # reset counter
+            
+            # get message
+            metadata = json.loads(msg.value().decode('utf-8'))
+            if self.t_start_time is None:
+                self.app_logger.info("[STARTED] Receiving records...")
+                print("[STARTED] Receiving records...")
+                self.t_start_time = time.time()
+                # sim_changement
+                self.source_num=self.graph.get_id_nums()
+                self.count=0
+            try:
+                # Update lag
+                try:
+                    low, high = self.consumer.get_watermark_offsets(msg.topic(), msg.partition())
+                    lag = high - msg.offset()
+                    self.metrics.update_lag_metrics(lag)
+                except Exception as lag_err:
+                    self.app_logger.warning(f"[Lag fetch error]: {lag_err}")
 
-            for tp, messages in msg_pack.items():
-                for msg in messages:
-                    if self.t_start_time is None:
-                        self.app_logger.info("[STARTED] Receiving records...")
-                        print("[STARTED] Receiving records...")
-                        self.t_start_time = time.time()
-                        # sim_changement
-                        self.source_num=self.graph.get_id_nums()
-                        self.count=0
-                    try:
-                        ## Update metrics
-                        # Update lag
-                        try:
-                            latest_offset = self.consumer.end_offsets([tp])[tp]
-                            lag = latest_offset - msg.offset
-                            self.metrics.update_lag_metrics(lag)
-                        except Exception as lag_err:
-                            self.app_logger.warning(f"[Lag fetch error]: {lag_err}")
-                        # Update record messages consumed
-                        self.metrics.update_message_consumed()
+                self.metrics.update_message_consumed()
 
-                        ## prepare data structure
-                        self.graph.accum_id_nums()
-                        id_num = self.graph.get_id_nums()
+                ## prepare data structure
+                self.graph.accum_id_nums()
+                id_num = self.graph.get_id_nums()
 
-                        metadata = msg.value
-                        metadata["rid"] = f"idx__{id_num}"
-                        current_time = time.time()
+                metadata = msg.value
+                metadata["rid"] = f"idx__{id_num}"
+                current_time = time.time()
 
-                        self.data_buffer.append(metadata)
+                self.data_buffer.append(metadata)
 
-                        ## Handle (time or count based) windowing
-                        if self.config["kafka"]["window_strategy"] == "time":
-                            self._handle_time_window(metadata, current_time)
-                        elif self.config["kafka"]["window_strategy"] == "count":
-                            self._handle_count_window(metadata)
-                        
+                ## Handle (time or count based) windowing
+                if self.config["kafka"]["window_strategy"] == "time":
+                    self._handle_time_window(metadata, current_time)
+                elif self.config["kafka"]["window_strategy"] == "count":
+                    self._handle_count_window(metadata)
+                
 
-                    except Exception as e:
-                        self.app_logger.error(f"Error processing message: {str(e)}")
-                        traceback.print_exc()
+            except Exception as e:
+                self.app_logger.error(f"Error processing message: {str(e)}")
+                traceback.print_exc()
                     
                     # self._reset_timer()
 

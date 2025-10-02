@@ -9,12 +9,19 @@ class Model:
             ):
         self.model_name = model_name.lower()
         if self.model_name == "bert":
-            model = AutoModelForSequenceClassification.from_pretrained("google-bert/bert-base-uncased", num_labels=num_labels)
-            tokenizer = AutoTokenizer.from_pretrained("google-bert/bert-base-uncased")
+            print(f"use Model {self.model_name}, labels number: {num_labels}")
+            self.model = AutoModelForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=num_labels)
+            self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
         elif self.model_name == "distilbert":
-            model = AutoModelForSequenceClassification.from_pretrained("distilbert/distilbert-base-uncased", num_labels=num_labels)
-            tokenizer = AutoTokenizer.from_pretrained("distilbert/distilbert-base-uncased")
-        return model, tokenizer
+            print(f"use Model {self.model_name}")
+            self.model = AutoModelForSequenceClassification.from_pretrained("distilbert-base-uncased", num_labels=num_labels)
+            self.tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
+    
+    def get_model(self):
+        return self.model
+    
+    def get_tokenizer(self):
+        return self.tokenizer
 
     def freeze_transformer_layers(model, base_model_name, freeze_until=0):
         """

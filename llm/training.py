@@ -1,8 +1,7 @@
-from llm.data_processing import dataset_preparing
+from llm.data_processing import preparing_testing, preparing_training
 from llm.model import Model
 import torch, random, numpy as np
 from transformers import TrainingArguments
-from transformers import DataCollatorWithPadding
 from transformers import Trainer
 import numpy as np
 import evaluate
@@ -24,7 +23,10 @@ def start_training(configuration):
     # load model and tokenizer
     model_choice = configuration.get("model", "bert")
     num_labels=configuration.get("num_labels", 2)
-    model, tokenizer = Model(model_choice, num_labels, freeze_layers = 0)
+    model_llm = Model(model_choice, num_labels, freeze_layers = 0)
+
+    model = model_llm.get_model()
+    tokenizer = model_llm.get_tokenizer()
 
     ##
     # choose device
@@ -33,7 +35,7 @@ def start_training(configuration):
 
     ##
     # prepare datasets
-    dataset = dataset_preparing(configuration["trainset_path"], configuration["validset_path"])
+    dataset = preparing_training(configuration["trainset_path"], configuration["validset_path"])
 
     ## 
     # tokenize
@@ -78,7 +80,8 @@ def start_training(configuration):
         learning_rate=configuration.get("learning_rate", 2e-5),
         per_device_train_batch_size=configuration.get("training_batch_size", 16),
         per_device_eval_batch_size=configuration.get("eval_batch_size", 16),
-        eval_strategy="epoch",
+        eevaluation_strategy="epoch",
+        save_strategy="epoch",
         num_train_epochs=configuration.get("epochs", 2),
         push_to_hub=False,
         fp16=True,   # Enable mixed-precision training (significantly faster on NVIDIA GPUs with Tensor Cores)
@@ -100,6 +103,13 @@ def start_training(configuration):
 
     trainer.train()
 
+    ## 
+    # test
+    dataset = preparing_testing(configuration["testset_path"])
+    dataset = dataset.map(tokenize_dataset, batched=True)
+
+    results = trainer.evaluate(eval_dataset=dataset["test"])
+    print(results)
     return trainer
 
 

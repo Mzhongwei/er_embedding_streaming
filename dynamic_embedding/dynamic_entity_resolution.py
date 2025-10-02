@@ -402,8 +402,8 @@ class IdxMatrix:
         返回 (match_rows, match_cols, match_scores)
         """
         D, I = IdxMatrix.topk_all_cosine(E, k=10, budget_mb=512)
-        # rows, cols, scores = IdxMatrix.ratio_rnn_edges(D, I, ratio=ratio, delta=delta, enforce_rnn=enforce_rnn, single_threshold=single_threshold)
-        rows, cols, scores = IdxMatrix.r1nn_only(I, D)
+        rows, cols, scores = IdxMatrix.ratio_rnn_edges(D, I, ratio=ratio, delta=delta, enforce_rnn=enforce_rnn, single_threshold=single_threshold)
+        # rows, cols, scores = IdxMatrix.r1nn_only(I, D)
         # if rows.size == 0:
         #     return rows, cols, scores
         # N = E.shape[0]

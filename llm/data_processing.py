@@ -15,13 +15,13 @@ def sequence_grnerating(path):
                     labels = df_row[col]
                 elif len(col_name_list) > 1 and col_name_list[1] != "id": 
                     if int(col_name_list[0][-1]) == 1:
-                        text1 = text1 + col_name_list[1] + df_row[col]
+                        text1 = text1 + str(col_name_list[1]) + str(df_row[col])
                     elif int(col_name_list[0][-1]) == 2:
-                        text2 = text2 + col_name_list[1] + df_row[col]
+                        text2 = text2 + str(col_name_list[1]) + str(df_row[col])
         df_result.loc[len(df_result)] = [text1, text2, labels]
     return df_result
 
-def dataset_preparing(trainset_path, validset_path):
+def preparing_training(trainset_path, validset_path):
     '''
     Load data from the dataset path and convert it to the correct format
     If the file size exceeds 1 GB, switch to other formats
@@ -34,6 +34,16 @@ def dataset_preparing(trainset_path, validset_path):
     dataset = DatasetDict({
         "train": trainset,
         "eval": validset
+    })
+
+    return dataset
+
+def preparing_testing(testset_path):
+    test_df = sequence_grnerating(testset_path)
+    testset = Dataset.from_pandas(test_df)
+
+    dataset = DatasetDict({
+        "test": testset
     })
 
     return dataset

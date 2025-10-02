@@ -1,4 +1,4 @@
-test*
+test_ignore*
 pipeline*/
 config/config*
 config/test.yaml

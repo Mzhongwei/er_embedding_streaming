@@ -15,7 +15,6 @@ from gensim.models import FastText, Word2Vec
 from comparison_approaches.exact_matching import preprocessing_batch
 from dataprocessing.kafkaconsumer import ConsumerService
 from dataprocessing.metrics import Metrics
-from llm.testing import start_testing
 from llm.training import start_training
 
 
@@ -172,9 +171,7 @@ def streaming_driver(configuration):
     start_kafka_consumer(configuration, graph, model, output_file_name)
 
 def training_driver(configuration):
-    trainer = start_training(configuration)
-    if configuration['testing']:
-        start_testing(trainer)
+    start_training(configuration)
 
 
 
@@ -214,7 +211,7 @@ def full_run(config_dir, config_file):
     configuration = load_yaml_config(path)
     # Checking the correctness of the configuration, setting default values for missing values.
     # TODO: adapt the check function to llm mode
-    # configuration = check_config_validity(configuration)
+    configuration = check_config_validity(configuration)
 
     # Running the task specified in the configuration file.
 
@@ -227,12 +224,12 @@ def full_run(config_dir, config_file):
     elif 'llm-train' in configuration['task']:
         training_driver(configuration)
     elif 'llm-test' in configuration['task']:
-        testing_driver(configuration)
+        pass
 '''
 # search: consumption
-@track_emissions(offline=True, country_iso_code="FRA")
 @measure_energy(handler=csv_handler)
 '''
+@track_emissions(offline=True, country_iso_code="FRA")
 def main(file_path=None, dir_path=None, args=None):
     results = None
     configuration = None

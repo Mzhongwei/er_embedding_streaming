@@ -116,6 +116,7 @@ def _get_match_pairs(data_dict, source_a):
     :return: ex. (item, match1), (item, match2)
     '''
     matchpair_set = set()
+    nodes = set()
     for key in data_dict:
         item_matched = int(key.split('__')[1])
         for value in data_dict[key]:
@@ -138,7 +139,9 @@ def _get_match_pairs(data_dict, source_a):
                 for id in el:
                     if id < source_a:
                         matchpair_set.add(el)
-    return matchpair_set
+            nodes.add(item_matched)
+            nodes.add(item_matching)
+    return matchpair_set, nodes
 
 def _get_similar_pairs(data_dict, n, appr, seuil):
     '''
@@ -175,7 +178,7 @@ def _get_similar_pairs(data_dict, n, appr, seuil):
                 res = f"pair: {el}, score: {item[0]} \n"
                 # print(f"pair: {el}, score: {item[0]}")
                 s = s + res
-    return matchpair_set, s
+    return matchpair_set
 
 def _get_similarity_pairs_with_degree(data_dict, n, appr):
     sim_list = {}
@@ -198,7 +201,7 @@ def compare_ground_truth(configuration):
     """
     ground_truth_file = configuration['match_file']
     similarity_file = configuration['similarity_file']
-    output_format = configuration['output_format']
+    output_format = configuration.get('output_format', 'graphml')
     k = configuration['eva']['n_first']
     appr = configuration['eva']['approximate']
     source_a = configuration['source_a']
@@ -207,11 +210,11 @@ def compare_ground_truth(configuration):
     
     # matches example: {item: [matches]}
     matches = _get_ground_truth(ground_truth_file)
-    actual_matches = _get_match_pairs(matches, source_a)
+    actual_matches, relevant_nodes = _get_match_pairs(matches, source_a)
     total_relevant_matches = len(actual_matches)
     f_total_relevant_matches = total_relevant_matches
     print(f'ground truth: {total_relevant_matches}')
-
+    print(f'good node: {relevant_nodes}')
     f_seuil = 0
     f_total_predicted_matches = 0
     f_correct_matches = 0
@@ -220,23 +223,36 @@ def compare_ground_truth(configuration):
     f_recall = 0
     f_f1_score = 0
     f_k = 0
+
+    f_seuil_bis = 0
+    f_total_predicted_matches_bis = 0
+    f_correct_matches_bis = 0
+    f_precision_bis = 0
+    f_recall_bis = 0
+    f_f1_score_bis = 0
+    f_k_bis = 0
+
     for seuil in [i / 100 for i in range(95, 0, -5)]:
         for k in range (1, 11):
             correct_matches = 0
-            predicted_matches, s = _get_similar_pairs(similarity_list, k, appr, seuil)
+            predicted_matches = _get_similar_pairs(similarity_list, k, appr, seuil)
             
             total_predicted_matches = len(predicted_matches)
+            total_predicted_matches_bis = sum(1 for (a, b) in predicted_matches if a in relevant_nodes or b in relevant_nodes)
+            print(total_predicted_matches_bis)
             
             correct_matches =  len(set(predicted_matches) & set(actual_matches)) 
 
             # Precision: Number of correct matches / Total predicted matches
             precision = correct_matches / total_predicted_matches if total_predicted_matches != 0 else 0.0
+            precision_bis = correct_matches / total_predicted_matches_bis if total_predicted_matches_bis != 0 else 0.0
             # Recall: Number of correct matches / Total relevant matches
             recall = correct_matches / total_relevant_matches if total_relevant_matches != 0 else 0.0
             f1_score = 2*precision*recall / (precision + recall) if (precision + recall) != 0 else 0.0
+            f1_score_bis = 2*precision_bis*recall / (precision_bis + recall) if (precision_bis + recall) != 0 else 0.0
 
-            if recall > f_recall:
-            # if f1_score > f_f1_score:
+            # if recall > f_recall:
+            if f1_score > f_f1_score:
                 f_seuil = seuil
                 f_total_predicted_matches = total_predicted_matches
                 f_correct_matches = correct_matches
@@ -244,6 +260,14 @@ def compare_ground_truth(configuration):
                 f_recall = recall
                 f_f1_score = f1_score
                 f_k = k
+            if f1_score_bis > f_f1_score_bis:
+                f_seuil_bis = seuil
+                f_total_predicted_matches_bis = total_predicted_matches_bis
+                f_correct_matches_bis = correct_matches
+                f_precision_bis = precision_bis
+                f_recall_bis = recall
+                f_f1_score_bis = f1_score_bis
+                f_k_bis = k
 
     sim_list = _get_similarity_pairs_with_degree(similarity_list, k, appr)
     similarity_analysis(sim_list, actual_matches, configuration['output_file_name'], k)
@@ -258,5 +282,5 @@ def compare_ground_truth(configuration):
     logger = write_log(f'''{configuration['log']['path']}''', dir_name, dir_name)
     
     logger.info(f'''[RESULTS] Evaluation result of similarity list in file [{similarity_file}] :\n threshold: {f_seuil} \n top k records: {f_k} \n decimal places retaining for the similarity: {appr} : \n correct matches: {f_correct_matches} \n total number of predicted matches: {f_total_predicted_matches} \n total number of matches in groud truth file: {f_total_relevant_matches} \n \n precision: {f_precision} \n recall: {f_recall} \n f1 score: {f_f1_score}''')
-    logger.info(s)
+    logger.info(f'''[RESULTS_BIS] Evaluation result of similarity list in file [{similarity_file}] :\n threshold: {f_seuil_bis} \n top k records: {f_k_bis} \n decimal places retaining for the similarity: {appr} : \n correct matches: {f_correct_matches_bis} \n total number of predicted matches: {f_total_predicted_matches_bis} \n total number of matches in groud truth file: {f_total_relevant_matches} \n \n precision: {f_precision_bis} \n recall: {f_recall_bis} \n f1 score: {f_f1_score_bis}''')
     # return precision, recall, f1_score
